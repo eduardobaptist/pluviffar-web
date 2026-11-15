@@ -1,0 +1,176 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "leaflet/dist/leaflet.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    /* DESIGN.md: Inter em tudo (títulos, texto e chrome de UI); mono do sistema só para chip IDs */
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-rain: var(--rain);
+    --shadow-card: var(--shadow-card);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Design system PluvIFFar — tokens do docs/DESIGN.md (tema "Supabase" do tweakcn).
+ * Verde-floresta (#0d623b, igual nos dois temas) é o único acento de marca; toda a estrutura é acromática.
+ * Tokens extras do domínio:
+ *  --rain     série de chuva nos gráficos (= primary, mantém a história em verde)
+ *  --success  cobertura boa / dispositivo online (chart-5)
+ *  --warning  cobertura parcial / dado atrasado (chart-4)
+ */
+:root {
+    --radius: 0.5rem;
+    --background: #fcfcfc;
+    --foreground: #161616;
+    --card: #fcfcfc;
+    --card-foreground: #161616;
+    --popover: #fcfcfc;
+    --popover-foreground: #161616;
+    --primary: #0d623b;
+    --primary-foreground: #e4f7ed;
+    --secondary: #fcfcfc;
+    --secondary-foreground: #161616;
+    --muted: #eeeeee;
+    --muted-foreground: #5c5c5c;
+    --accent: #eeeeee;
+    --accent-foreground: #1f1f1f;
+    --destructive: #c83316;
+    --border: #dedede;
+    --input: #dedede;
+    --ring: #0d623b;
+    --chart-1: #71e1ac;
+    --chart-2: #3981f6;
+    --chart-3: #8c5df8;
+    --chart-4: #f49f1e;
+    --chart-5: #10ba82;
+    --rain: #10ba82;
+    --success: #10ba82;
+    --success-foreground: #0b5e42;
+    --warning: #f49f1e;
+    --warning-foreground: #7a4a06;
+    --sidebar: #fcfcfc;
+    --sidebar-foreground: #717171;
+    --sidebar-primary: #0d623b;
+    --sidebar-primary-foreground: #e4f7ed;
+    --sidebar-accent: #eeeeee;
+    --sidebar-accent-foreground: #161616;
+    --sidebar-border: #dedede;
+    --sidebar-ring: #0d623b;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.09), 0 4px 12px -6px rgb(0 0 0 / 0.12);
+}
+
+.dark {
+    --background: #121212;
+    --foreground: #e4e8ef;
+    --card: #181818;
+    --card-foreground: #e4e8ef;
+    --popover: #181818;
+    --popover-foreground: #e4e8ef;
+    --primary: #0d623b;
+    --primary-foreground: #e4f7ed;
+    --secondary: #242424;
+    --secondary-foreground: #e4e8ef;
+    --muted: #1f1f1f;
+    --muted-foreground: #a1a1a1;
+    --accent: #2e2e2e;
+    --accent-foreground: #e4e8ef;
+    --destructive: #e2562f;
+    --border: #292929;
+    --input: #333333;
+    --ring: #10ba82;
+    --chart-1: #71e1ac;
+    --chart-2: #5b97f8;
+    --chart-3: #a283fa;
+    --chart-4: #f6b04a;
+    --chart-5: #10ba82;
+    --rain: #3fd39a;
+    --success: #10ba82;
+    --success-foreground: #7fe3bd;
+    --warning: #f6b04a;
+    --warning-foreground: #f8c983;
+    --sidebar: #121212;
+    --sidebar-foreground: #a1a1a1;
+    --sidebar-primary: #0d623b;
+    --sidebar-primary-foreground: #e4f7ed;
+    --sidebar-accent: #242424;
+    --sidebar-accent-foreground: #e4e8ef;
+    --sidebar-border: #292929;
+    --sidebar-ring: #10ba82;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.17), 0 4px 12px -6px rgb(0 0 0 / 0.3);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+  z-index: 0;
+  background: var(--muted);
+}
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--popover);
+  color: var(--popover-foreground);
+}

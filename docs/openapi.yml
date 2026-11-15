@@ -1,0 +1,3138 @@
+openapi: 3.1.0
+info:
+  title: PluvIFFar API
+  description: |
+    API de gerenciamento do PluvIFFar (monitoramento pluviométrico).
+
+    ## Autenticação (sessão por cookie, sem JWT)
+    1. `GET /api/auth/csrf` → recebe o cookie `XSRF-TOKEN` (legível por JS) e o token no corpo.
+    2. `POST /api/auth/login` com o header `X-XSRF-TOKEN` → cria a sessão (cookie `SESSION`, HttpOnly).
+       O ID da sessão e o token CSRF são renovados: leia de novo o cookie `XSRF-TOKEN`.
+    3. `GET /api/auth/me` → usuário e perfil. 401 = sem sessão ou expirada (volte ao login).
+       Se `mustChangePassword = true`, só `/api/auth/**` funciona até `PUT /api/auth/password`.
+    4. `POST /api/auth/logout` → encerra a sessão.
+
+    Toda requisição POST/PUT/PATCH/DELETE precisa do header `X-XSRF-TOKEN` com o valor atual do cookie
+    `XSRF-TOKEN` (reemitido em toda resposta). No navegador, envie os cookies (`credentials: 'include'`).
+    A sessão expira após 30 min de inatividade.
+
+    ## Erros
+    Todo erro 4xx/5xx tem o corpo `ApiError`: `code` (estável, use no front), `message` (pt-BR, pronta para exibir),
+    `errors` (por campo, em `VALIDATION_ERROR`) e `traceId` (também no header `X-Trace-Id`).
+    Recurso de outro produtor responde 404 (não revela existência).
+
+    ## Paginação e período
+    Listas usam `page` (0-based), `size` (padrão 20, máx. 100) e `sort=campo,asc|desc`, e devolvem `PageResponse`.
+    Filtros de período usam `from`/`to` em ISO-8601 (ex.: `2026-11-10T00:00:00Z`).
+  version: v1
+servers:
+- url: http://localhost:41991
+  description: Generated server url
+tags:
+- name: Autenticação
+  description: "Sessão por cookie (SESSION) + CSRF. Fluxo: GET /csrf → POST /login\
+    \ → GET /me → POST /logout."
+- name: Usuários
+  description: Gestão de usuários — somente ADMIN. Não há auto-cadastro.
+- name: Gateways
+  description: Gateways do produtor. PRODUCER gerencia só os próprios (os de outro
+    produtor respondem 404); ADMIN gerencia todos.
+- name: Área pública
+  description: "Sem login. Só estações marcadas como públicas pelo dono: nome, localizaç\
+    ão e chuva. Nunca expõe dados do dono nem o chip ID."
+- name: Estações
+  description: Estações (pluviômetros) do produtor. PRODUCER gerencia só as próprias
+    (as de outro produtor respondem 404); ADMIN gerencia todas.
+- name: Telemetria
+  description: "Dados gravados pelo worker para uma estação. Mesma regra de posse\
+    \ das estações (de outro produtor → 404); o ADMIN também lê dados de estações\
+    \ excluídas. Períodos são [from, to) em ISO-8601 (ex.: 2026-11-10T00:00:00Z)."
+paths:
+  /api/users/{id}:
+    get:
+      tags:
+      - Usuários
+      summary: Detalhar usuário
+      operationId: get
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Usuário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: USER_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    put:
+      tags:
+      - Usuários
+      summary: Editar usuário
+      description: "Substitui nome, email e perfil. Trocar o perfil encerra as sessõ\
+        es do usuário. O ADMIN não pode alterar o próprio perfil."
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+        required: true
+      responses:
+        "200":
+          description: Usuário atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: USER_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: EMAIL_ALREADY_IN_USE ou CANNOT_CHANGE_OWN_ROLE.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/users/{id}/password:
+    put:
+      tags:
+      - Usuários
+      summary: Redefinir senha do usuário
+      description: Define uma senha provisória (troca obrigatória no próximo login)
+        e encerra todas as sessões do usuário.
+      operationId: resetPassword
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+        required: true
+      responses:
+        "204":
+          description: Senha redefinida.
+        "404":
+          description: USER_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/stations/{id}:
+    get:
+      tags:
+      - Estações
+      summary: Detalhar estação
+      operationId: get_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Estação.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationResponse"
+        "404":
+          description: "STATION_NOT_FOUND (inexistente, excluída ou de outro produtor)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    put:
+      tags:
+      - Estações
+      summary: Editar estação
+      description: "Substitui nome, descrição, localização, visibilidade pública e\
+        \ gateway. Ao trocar de gateway, a estação passa a ser do dono do novo gateway."
+      operationId: update_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStationRequest"
+        required: true
+      responses:
+        "200":
+          description: Estação atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationResponse"
+        "400":
+          description: VALIDATION_ERROR (inclui locationComplete e publicWithLocation).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: STATION_NOT_FOUND ou GATEWAY_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+    delete:
+      tags:
+      - Estações
+      summary: Excluir estação
+      description: "Exclusão lógica: as leituras gravadas são mantidas e o chip ID\
+        \ fica livre para novo cadastro. A estação sai da área pública."
+      operationId: delete
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Estação excluída.
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/stations/{id}/favorite:
+    put:
+      tags:
+      - Estações
+      summary: Marcar estação como favorita
+      description: "Define a estação favorita do usuário logado (uma por usuário;\
+        \ substitui a anterior). Aparece como favorite=true na listagem e no detalhe\
+        \ (ex.: o front mostra primeiro no dashboard). Idempotente."
+      operationId: markFavorite
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Estação marcada como favorita.
+        "404":
+          description: "STATION_NOT_FOUND (inexistente, excluída ou de outro produtor)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+    delete:
+      tags:
+      - Estações
+      summary: Desmarcar estação favorita
+      description: "Remove a favorita do usuário logado, se for esta estação. Idempotente."
+      operationId: unmarkFavorite
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Estação não é mais a favorita.
+        "404":
+          description: "STATION_NOT_FOUND (inexistente, excluída ou de outro produtor)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/gateways/{id}:
+    get:
+      tags:
+      - Gateways
+      summary: Detalhar gateway
+      operationId: get_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Gateway.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "404":
+          description: "GATEWAY_NOT_FOUND (inexistente, excluído ou de outro produtor)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    put:
+      tags:
+      - Gateways
+      summary: Editar gateway
+      description: "Substitui nome e descrição. ADMIN pode transferir o gateway para\
+        \ outro produtor (ownerId): as estações dele acompanham."
+      operationId: update_2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGatewayRequest"
+        required: true
+      responses:
+        "200":
+          description: Gateway atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "400":
+          description: VALIDATION_ERROR ou INVALID_OWNER.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (PRODUCER tentando transferir), CSRF_TOKEN_INVALID\
+            \ ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: GATEWAY_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+    delete:
+      tags:
+      - Gateways
+      summary: Excluir gateway
+      description: "Exclusão lógica: os dados gravados são mantidos e o chip ID fica\
+        \ livre para novo cadastro. Não é permitido enquanto o gateway tiver estaç\
+        ões ativas."
+      operationId: delete_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Gateway excluído.
+        "404":
+          description: GATEWAY_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: GATEWAY_HAS_ACTIVE_STATIONS.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/auth/password:
+    put:
+      tags:
+      - Autenticação
+      summary: Trocar a própria senha
+      description: "Confere a senha atual e grava a nova. Encerra as outras sessõ\
+        es do usuário (a atual continua) e, se a troca era obrigatória, libera o acesso\
+        \ ao resto da API."
+      operationId: changePassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+        required: true
+      responses:
+        "204":
+          description: Senha alterada.
+        "400":
+          description: "VALIDATION_ERROR, CURRENT_PASSWORD_INCORRECT ou NEW_PASSWORD_SAME_AS_CURRENT."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/users:
+    get:
+      tags:
+      - Usuários
+      summary: Listar usuários
+      description: "Lista paginada com filtros opcionais. sort aceita: name, email,\
+        \ role, active, createdAt, updatedAt (ex.: sort=createdAt,desc). Padrão: name,asc."
+      operationId: list
+      parameters:
+      - name: search
+        in: query
+        description: Busca por parte do nome ou do email (sem diferenciar maiúsculas).
+        required: false
+        schema:
+          type: string
+        example: maria
+      - name: role
+        in: query
+        description: Filtra por perfil.
+        required: false
+        schema:
+          type: string
+          description: "Perfil do usuário. ADMIN: superusuário (gerencia usuários\
+            \ e vê tudo). PRODUCER: gerencia apenas os próprios gateways e estaçõ\
+            es."
+          enum:
+          - ADMIN
+          - PRODUCER
+      - name: active
+        in: query
+        description: Filtra por ativo/desativado.
+        required: false
+        schema:
+          type: boolean
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "name,ASC"
+          items:
+            type: string
+      responses:
+        "200":
+          description: Página de usuários.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseUserResponse"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    post:
+      tags:
+      - Usuários
+      summary: Cadastrar usuário
+      description: Cria o usuário com senha provisória; ele precisa trocá-la no primeiro
+        login.
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+        required: true
+      responses:
+        "201":
+          description: Usuário criado (header Location aponta para ele).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "409":
+          description: EMAIL_ALREADY_IN_USE.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/stations:
+    get:
+      tags:
+      - Estações
+      summary: Listar estações
+      description: "PRODUCER: só as próprias. ADMIN: todas, com filtro opcional por\
+        \ dono. sort aceita: name, hardwareId, createdAt, updatedAt. Padrão: name,asc."
+      operationId: list_1
+      parameters:
+      - name: gatewayId
+        in: query
+        description: Filtra pelo gateway.
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: ownerId
+        in: query
+        description: "Somente ADMIN: filtra por produtor dono."
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: isPublic
+        in: query
+        description: Filtra por visibilidade pública.
+        required: false
+        schema:
+          type: boolean
+      - name: search
+        in: query
+        description: Busca por parte do nome ou do chip ID.
+        required: false
+        schema:
+          type: string
+        example: talhão
+      - name: includeDeleted
+        in: query
+        description: "Somente ADMIN: inclui estações excluídas."
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "name,ASC"
+          items:
+            type: string
+      responses:
+        "200":
+          description: Página de estações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseStationResponse"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    post:
+      tags:
+      - Estações
+      summary: Cadastrar estação
+      description: "Registra o chip ID do pluviômetro, vinculado a um gateway do mesmo\
+        \ produtor. Só pacotes MQTT de equipamentos cadastrados são gravados."
+      operationId: create_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStationRequest"
+        required: true
+      responses:
+        "201":
+          description: Estação cadastrada (header Location aponta para ela).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationResponse"
+        "400":
+          description: VALIDATION_ERROR (inclui locationComplete e publicWithLocation).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: "GATEWAY_NOT_FOUND (gateway inexistente, excluído ou de outro\
+            \ produtor)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: HARDWARE_ID_ALREADY_REGISTERED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED, CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/gateways:
+    get:
+      tags:
+      - Gateways
+      summary: Listar gateways
+      description: "PRODUCER: só os próprios. ADMIN: todos, com filtro opcional por\
+        \ dono. sort aceita: name, hardwareId, createdAt, updatedAt. Padrão: name,asc."
+      operationId: list_2
+      parameters:
+      - name: ownerId
+        in: query
+        description: "Somente ADMIN: filtra por produtor dono."
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        in: query
+        description: Busca por parte do nome ou do chip ID.
+        required: false
+        schema:
+          type: string
+        example: sede
+      - name: includeDeleted
+        in: query
+        description: "Somente ADMIN: inclui gateways excluídos."
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "name,ASC"
+          items:
+            type: string
+      responses:
+        "200":
+          description: Página de gateways.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseGatewayResponse"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+    post:
+      tags:
+      - Gateways
+      summary: Cadastrar gateway
+      description: "Registra o chip ID do gateway. Só pacotes MQTT de equipamentos\
+        \ cadastrados são gravados. PRODUCER: o dono é ele mesmo (omita ownerId).\
+        \ ADMIN: informe ownerId (produtor ativo)."
+      operationId: create_2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGatewayRequest"
+        required: true
+      responses:
+        "201":
+          description: Gateway cadastrado (header Location aponta para ele).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayResponse"
+        "400":
+          description: "VALIDATION_ERROR, OWNER_REQUIRED (ADMIN sem ownerId) ou INVALID_OWNER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (PRODUCER informando outro dono), CSRF_TOKEN_INVALID\
+            \ ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: HARDWARE_ID_ALREADY_REGISTERED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/auth/logout:
+    post:
+      tags:
+      - Autenticação
+      summary: Logout
+      description: "Invalida a sessão e limpa os cookies SESSION e XSRF-TOKEN. Requer\
+        \ o header X-XSRF-TOKEN. Idempotente: sem sessão, também responde 204."
+      operationId: logout
+      responses:
+        "204":
+          description: Sessão encerrada.
+        "403":
+          description: "CSRF_TOKEN_INVALID: header X-XSRF-TOKEN ausente ou diferente\
+            \ do cookie."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - csrfHeader: []
+  /api/auth/login:
+    post:
+      tags:
+      - Autenticação
+      summary: Login
+      description: "Autentica por email e senha e cria a sessão (cookie SESSION, HttpOnly).\
+        \ Requer o header X-XSRF-TOKEN. O ID da sessão e o token CSRF são renovados:\
+        \ use o novo cookie XSRF-TOKEN a partir daqui. Se mustChangePassword = true,\
+        \ leve o usuário à troca de senha."
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: Login efetuado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserResponse"
+        "401":
+          description: "INVALID_CREDENTIALS: email ou senha inválidos (mensagem ú\
+            nica, não revela se o usuário existe)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "CSRF_TOKEN_INVALID: header X-XSRF-TOKEN ausente ou diferente\
+            \ do cookie."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - csrfHeader: []
+  /api/users/{id}/status:
+    patch:
+      tags:
+      - Usuários
+      summary: Ativar/desativar usuário
+      description: Desativar impede o login e encerra imediatamente todas as sessões
+        do usuário. O ADMIN não pode desativar a si mesmo.
+      operationId: updateStatus
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+        required: true
+      responses:
+        "200":
+          description: Status atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: USER_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: CANNOT_DEACTIVATE_SELF.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: "ACCESS_DENIED (não é ADMIN), CSRF_TOKEN_INVALID ou PASSWORD_CHANGE_REQUIRED."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+        csrfHeader: []
+  /api/stations/{id}/status:
+    get:
+      tags:
+      - Telemetria
+      summary: Status do dispositivo
+      description: "Bateria, sinal (RSSI) e uptime (tópico status), do mais recente\
+        \ para o mais antigo (sort é ignorado). Padrão: últimas 24 h; máximo 93 dias."
+      operationId: status
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        description: "Início (inclusivo), ISO-8601. Padrão: to − 24 h."
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Fim (exclusivo), ISO-8601. Padrão: agora."
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "200":
+          description: Página de status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseDeviceStatusResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/stations/{id}/readings:
+    get:
+      tags:
+      - Telemetria
+      summary: Leituras brutas
+      description: "Leituras do tópico dados, da mais recente para a mais antiga (sort\
+        \ é ignorado). Padrão: últimas 24 h; máximo 93 dias."
+      operationId: readings
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        description: "Início (inclusivo), ISO-8601. Padrão: to − 24 h."
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Fim (exclusivo), ISO-8601. Padrão: agora."
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "200":
+          description: Página de leituras.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseReadingResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/stations/{id}/precipitation:
+    get:
+      tags:
+      - Telemetria
+      summary: Série de chuva agregada
+      description: "Chuva somada por hora, dia, semana ou mês (no fuso pedido). Sem\
+        \ from, usa o período padrão da granularidade; sem to, até agora. Buckets\
+        \ sem leitura não aparecem."
+      operationId: precipitation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: bucket
+        in: query
+        description: Granularidade (padrão DAY).
+        required: false
+        schema:
+          type: string
+          description: "Granularidade da agregação: HOUR (padrão 7 dias, máx. 93),\
+            \ DAY (padrão 30 dias, máx. 1100), WEEK (padrão 365 dias, máx. 3660; semanas\
+            \ começam na segunda), MONTH (padrão 365 dias, máx. 10980)."
+          enum:
+          - HOUR
+          - DAY
+          - WEEK
+          - MONTH
+      - name: from
+        in: query
+        description: "Início (inclusivo), ISO-8601."
+        required: false
+        schema:
+          type: string
+          format: date-time
+        example: 2026-10-01T03:00:00Z
+      - name: to
+        in: query
+        description: "Fim (exclusivo), ISO-8601. Padrão: agora."
+        required: false
+        schema:
+          type: string
+          format: date-time
+        example: 2026-11-01T03:00:00Z
+      - name: timezone
+        in: query
+        description: "Fuso IANA para alinhar dias/semanas/meses e \"hoje\". Padrã\
+          o: America/Sao_Paulo."
+        required: false
+        schema:
+          type: string
+        example: America/Sao_Paulo
+      responses:
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "200":
+          description: Série.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrecipitationSeriesResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/stations/{id}/overview:
+    get:
+      tags:
+      - Telemetria
+      summary: Resumo da estação
+      description: "Última leitura, último status e chuva acumulada hoje, nas últimas\
+        \ 24 h, 7 e 30 dias."
+      operationId: overview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: timezone
+        in: query
+        description: "Fuso IANA para alinhar dias/semanas/meses e \"hoje\". Padrã\
+          o: America/Sao_Paulo."
+        required: false
+        schema:
+          type: string
+        example: America/Sao_Paulo
+      responses:
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "200":
+          description: Resumo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationOverviewResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/stations/{id}/config-reports:
+    get:
+      tags:
+      - Telemetria
+      summary: Histórico de configuração
+      description: "Versões de firmware/hardware, intervalo de envio e mm por basculada\
+        \ reportados pelo dispositivo (tópico conf), do mais recente para o mais antigo.\
+        \ O estado atual também está no detalhe da estação."
+      operationId: configReports
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "404":
+          description: STATION_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "200":
+          description: Página de configurações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseConfigReportResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/public/stations:
+    get:
+      tags:
+      - Área pública
+      summary: Listar estações públicas
+      description: "Todas as estações públicas (sem paginação, para o mapa), com ú\
+        ltima leitura e chuva das últimas 24 h."
+      operationId: list_3
+      responses:
+        "200":
+          description: "Estações públicas, em ordem de nome."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicStationSummary"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security: []
+  /api/public/stations/{id}:
+    get:
+      tags:
+      - Área pública
+      summary: Detalhar estação pública
+      description: "Localização e chuva acumulada hoje, 24 h, 7 e 30 dias."
+      operationId: get_3
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: timezone
+        in: query
+        description: "Fuso IANA para alinhar dias/semanas/meses e \"hoje\". Padrã\
+          o: America/Sao_Paulo."
+        required: false
+        schema:
+          type: string
+        example: America/Sao_Paulo
+      responses:
+        "200":
+          description: Estação pública.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStationDetail"
+        "404":
+          description: STATION_NOT_FOUND (inexistente ou não pública).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "VALIDATION_ERROR (com errors por campo), MALFORMED_REQUEST\
+            \ ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security: []
+  /api/public/stations/{id}/precipitation:
+    get:
+      tags:
+      - Área pública
+      summary: Série de chuva de estação pública
+      description: "Mesma agregação da área logada (hora, dia, semana ou mês). Buckets\
+        \ sem leitura não aparecem."
+      operationId: precipitation_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: bucket
+        in: query
+        description: Granularidade (padrão DAY).
+        required: false
+        schema:
+          type: string
+          description: "Granularidade da agregação: HOUR (padrão 7 dias, máx. 93),\
+            \ DAY (padrão 30 dias, máx. 1100), WEEK (padrão 365 dias, máx. 3660; semanas\
+            \ começam na segunda), MONTH (padrão 365 dias, máx. 10980)."
+          enum:
+          - HOUR
+          - DAY
+          - WEEK
+          - MONTH
+      - name: from
+        in: query
+        description: "Início (inclusivo), ISO-8601."
+        required: false
+        schema:
+          type: string
+          format: date-time
+        example: 2026-10-01T03:00:00Z
+      - name: to
+        in: query
+        description: "Fim (exclusivo), ISO-8601. Padrão: agora."
+        required: false
+        schema:
+          type: string
+          format: date-time
+        example: 2026-11-01T03:00:00Z
+      - name: timezone
+        in: query
+        description: "Fuso IANA para alinhar dias/semanas/meses e \"hoje\". Padrã\
+          o: America/Sao_Paulo."
+        required: false
+        schema:
+          type: string
+        example: America/Sao_Paulo
+      responses:
+        "200":
+          description: Série.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrecipitationSeriesResponse"
+        "404":
+          description: STATION_NOT_FOUND (inexistente ou não pública).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: "INVALID_PERIOD, PERIOD_TOO_LONG ou INVALID_PARAMETER."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security: []
+  /api/auth/me:
+    get:
+      tags:
+      - Autenticação
+      summary: Usuário logado
+      description: "Dados e perfil do usuário da sessão. O front não lê o cookie HttpOnly,\
+        \ então usa este endpoint para saber se há sessão: 401 = sem sessão/expirada."
+      operationId: me
+      responses:
+        "200":
+          description: Usuário logado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserResponse"
+        "401":
+          description: "UNAUTHENTICATED: sem sessão ou sessão expirada."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ACCESS_DENIED ou PASSWORD_CHANGE_REQUIRED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security:
+      - sessionCookie: []
+  /api/auth/csrf:
+    get:
+      tags:
+      - Autenticação
+      summary: Obter token CSRF
+      description: "Emite o cookie XSRF-TOKEN e devolve o mesmo valor no corpo. Chame\
+        \ ao abrir a aplicação, antes do login. O cookie é reemitido em toda resposta,\
+        \ inclusive quando o token é renovado após o login."
+      operationId: csrf
+      responses:
+        "200":
+          description: Token emitido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsrfTokenResponse"
+        "500":
+          description: INTERNAL_ERROR.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      security: []
+components:
+  schemas:
+    UpdateUserRequest:
+      type: object
+      description: "Edição de usuário pelo ADMIN (substitui nome, email e perfil).\
+        \ Trocar o perfil encerra as sessões ativas do usuário."
+      properties:
+        name:
+          type: string
+          description: Nome.
+          example: Maria da Silva
+          maxLength: 120
+          minLength: 0
+        email:
+          type: string
+          format: email
+          description: "Email (único, sem diferenciar maiúsculas)."
+          example: maria@exemplo.com.br
+          maxLength: 254
+          minLength: 0
+        role:
+          type: string
+          description: Perfil.
+          enum:
+          - ADMIN
+          - PRODUCER
+          example: PRODUCER
+      required:
+      - email
+      - name
+      - role
+    ApiError:
+      description: Corpo padrão de toda resposta de erro (4xx/5xx).
+      properties:
+        code:
+          type: string
+          description: Código estável do erro (enum ErrorCode); use-o no frontend
+            para decidir o comportamento.
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Mensagem pronta para exibir ao usuário (pt-BR).
+          example: Há campos inválidos na requisição.
+        errors:
+          type: array
+          description: Erros por campo (apenas em VALIDATION_ERROR; vazio nos demais).
+          items:
+            $ref: "#/components/schemas/FieldError"
+        traceId:
+          type: string
+          description: Identificador da requisição (também no header X-Trace-Id);
+            informe-o ao reportar problemas.
+          example: 6f1c2a9e4b7d4e0f9a3b1c2d3e4f5a6b
+      required:
+      - code
+      - errors
+      - message
+      - traceId
+    FieldError:
+      description: Erro de validação de um campo.
+      properties:
+        field:
+          type: string
+          description: Nome do campo (ou parâmetro) inválido.
+          example: email
+        message:
+          type: string
+          description: Mensagem para o usuário (pt-BR).
+          example: Informe um email válido.
+      required:
+      - field
+      - message
+    UserResponse:
+      type: object
+      description: Dados de um usuário (nunca inclui a senha).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador do usuário.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome.
+          example: Maria da Silva
+        email:
+          type: string
+          description: Email (sempre em minúsculas).
+          example: maria@exemplo.com.br
+        role:
+          type: string
+          description: Perfil.
+          enum:
+          - ADMIN
+          - PRODUCER
+          example: PRODUCER
+        active:
+          type: boolean
+          description: Se o usuário pode fazer login.
+          example: true
+        mustChangePassword:
+          type: boolean
+          description: Se precisa trocar a senha antes de usar a plataforma.
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: "Criação (ISO-8601, UTC)."
+          example: 2026-11-10T12:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Última alteração (ISO-8601, UTC)."
+          example: 2026-11-10T12:00:00Z
+      required:
+      - active
+      - createdAt
+      - email
+      - id
+      - mustChangePassword
+      - name
+      - role
+      - updatedAt
+    ResetPasswordRequest:
+      type: object
+      description: Redefinição de senha pelo ADMIN. A nova senha é provisória (troca
+        obrigatória no próximo login) e todas as sessões do usuário são encerradas.
+      properties:
+        newPassword:
+          type: string
+          description: Nova senha provisória (8 a 72 caracteres).
+          example: novaProvisoria123
+          maxLength: 72
+          minLength: 8
+      required:
+      - newPassword
+    UpdateStationRequest:
+      type: object
+      description: "Edição de estação (substitui todos os campos editáveis). O chip\
+        \ ID não muda: para trocar o equipamento, exclua e cadastre outro."
+      properties:
+        gatewayId:
+          type: string
+          format: uuid
+          description: "Gateway que recebe os dados desta estação (precisa ser do\
+            \ mesmo produtor). ADMIN pode escolher gateway de outro produtor: a estaç\
+            ão passa a ser desse produtor."
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome.
+          example: Pluviômetro do talhão 3
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: Descrição livre.
+          example: Ao lado da porteira
+          maxLength: 1000
+          minLength: 0
+        latitude:
+          type: number
+          format: double
+          description: Latitude em graus decimais (WGS84). Informe junto com a longitude.
+          example: -29.6842
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          format: double
+          description: Longitude em graus decimais (WGS84). Informe junto com a latitude.
+          example: -53.8069
+          maximum: 180
+          minimum: -180
+        isPublic:
+          type: boolean
+          description: "Mostrar na área pública (só chuva e localização). Exige latitude/longitude.\
+            \ Padrão: false."
+          example: false
+      required:
+      - gatewayId
+      - name
+    GatewaySummary:
+      type: object
+      description: Gateway ao qual a estação está vinculada.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID do gateway.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        hardwareId:
+          type: string
+          description: Chip ID do gateway.
+          example: gt-570db4
+        name:
+          type: string
+          description: Nome do gateway.
+          example: Gateway da sede
+      required:
+      - hardwareId
+      - id
+      - name
+    OwnerSummary:
+      type: object
+      description: Produtor dono do equipamento (nunca exposto na área pública).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID do produtor.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome do produtor.
+          example: Maria da Silva
+        email:
+          type: string
+          description: Email do produtor.
+          example: maria@exemplo.com.br
+      required:
+      - email
+      - id
+      - name
+    StationResponse:
+      type: object
+      description: "Estação (pluviômetro), na visão do dono/ADMIN. A área pública\
+        \ usa outro DTO, sem dados do dono."
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID da estação na plataforma.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        hardwareId:
+          type: string
+          description: Chip ID do pluviômetro (campo id do payload MQTT). Imutável.
+          example: 580db2
+        name:
+          type: string
+          description: Nome.
+          example: Pluviômetro do talhão 3
+        description:
+          type: string
+          description: Descrição livre.
+          example: Ao lado da porteira
+        latitude:
+          type: number
+          format: double
+          description: "Latitude (graus decimais, WGS84)."
+          example: -29.6842
+        longitude:
+          type: number
+          format: double
+          description: "Longitude (graus decimais, WGS84)."
+          example: -53.8069
+        isPublic:
+          type: boolean
+          description: "Se aparece na área pública (só chuva e localização, nunca\
+            \ dados do dono)."
+          example: true
+        favorite:
+          type: boolean
+          description: "Se é a estação favorita do usuário logado (uma por usuário;\
+            \ ex.: mostrar primeiro no dashboard)."
+          example: false
+        gateway:
+          $ref: "#/components/schemas/GatewaySummary"
+          description: Gateway vinculado.
+        owner:
+          $ref: "#/components/schemas/OwnerSummary"
+          description: Produtor dono (sempre o dono do gateway).
+        fwVersion:
+          type: string
+          description: Firmware reportado pelo pluviômetro (tópico conf).
+          example: 1.0.0
+        hwVersion:
+          type: string
+          description: Hardware reportado pelo pluviômetro (tópico conf).
+          example: "1.0"
+        sendIntervalS:
+          type: integer
+          format: int32
+          description: "Intervalo de envio reportado, em segundos."
+          example: 60
+        mmPerTip:
+          type: number
+          description: Milímetros por basculada reportados.
+          example: 0.2
+        configReportedAt:
+          type: string
+          format: date-time
+          description: Quando o dispositivo reportou a configuração pela última vez.
+          example: 2026-11-10T12:00:00Z
+        createdAt:
+          type: string
+          format: date-time
+          description: Criação.
+          example: 2026-11-10T12:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Última alteração.
+          example: 2026-11-10T12:00:00Z
+        deletedAt:
+          type: string
+          format: date-time
+          description: Exclusão (soft delete); preenchido só para o ADMIN com includeDeleted=true.
+      required:
+      - createdAt
+      - favorite
+      - gateway
+      - hardwareId
+      - id
+      - isPublic
+      - name
+      - owner
+      - updatedAt
+    UpdateGatewayRequest:
+      type: object
+      description: "Edição de gateway (substitui nome e descrição). O chip ID não\
+        \ muda: para trocar o equipamento, exclua e cadastre outro."
+      properties:
+        name:
+          type: string
+          description: Nome.
+          example: Gateway da sede
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: Descrição livre.
+          example: Instalado no galpão principal
+          maxLength: 1000
+          minLength: 0
+        ownerId:
+          type: string
+          format: uuid
+          description: "Somente ADMIN: transfere o gateway (e todas as estações dele)\
+            \ para outro produtor. Omitir mantém o dono atual."
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+      required:
+      - name
+    GatewayResponse:
+      type: object
+      description: Gateway (ESP8266 que recebe dos pluviômetros e publica no broker
+        MQTT).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID do gateway na plataforma.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        hardwareId:
+          type: string
+          description: "Chip ID (segmento do tópico MQTT pluviffar/{hardwareId}/...).\
+            \ Imutável."
+          example: gt-570db4
+        name:
+          type: string
+          description: Nome.
+          example: Gateway da sede
+        description:
+          type: string
+          description: Descrição livre.
+          example: Instalado no galpão principal
+        owner:
+          $ref: "#/components/schemas/OwnerSummary"
+          description: Produtor dono.
+        fwVersion:
+          type: string
+          description: Versão de firmware reportada pelo dispositivo (tópico conf).
+          example: 1.0.0
+        hwVersion:
+          type: string
+          description: Versão de hardware reportada pelo dispositivo (tópico conf).
+          example: "1.0"
+        configReportedAt:
+          type: string
+          format: date-time
+          description: Quando o dispositivo reportou a configuração pela última vez.
+          example: 2026-11-10T12:00:00Z
+        createdAt:
+          type: string
+          format: date-time
+          description: Criação.
+          example: 2026-11-10T12:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Última alteração.
+          example: 2026-11-10T12:00:00Z
+        deletedAt:
+          type: string
+          format: date-time
+          description: Exclusão (soft delete); preenchido só em listagens do ADMIN
+            com includeDeleted=true.
+      required:
+      - createdAt
+      - hardwareId
+      - id
+      - name
+      - owner
+      - updatedAt
+    ChangePasswordRequest:
+      type: object
+      description: Troca da própria senha. Encerra as outras sessões do usuário e
+        libera o acesso quando a troca era obrigatória.
+      properties:
+        currentPassword:
+          type: string
+          description: Senha atual.
+          example: senhaProvisoria123
+          minLength: 1
+        newPassword:
+          type: string
+          description: "Nova senha (8 a 72 caracteres, diferente da atual)."
+          example: minhaNovaSenha456
+          maxLength: 72
+          minLength: 8
+      required:
+      - currentPassword
+      - newPassword
+    CreateUserRequest:
+      type: object
+      description: "Cadastro de usuário pelo ADMIN. A senha é provisória: o usuário\
+        \ deve trocá-la no primeiro login."
+      properties:
+        name:
+          type: string
+          description: Nome.
+          example: Maria da Silva
+          maxLength: 120
+          minLength: 0
+        email:
+          type: string
+          format: email
+          description: "Email (único, sem diferenciar maiúsculas)."
+          example: maria@exemplo.com.br
+          maxLength: 254
+          minLength: 0
+        role:
+          type: string
+          description: Perfil.
+          enum:
+          - ADMIN
+          - PRODUCER
+          example: PRODUCER
+        password:
+          type: string
+          description: Senha provisória (8 a 72 caracteres).
+          example: senhaProvisoria123
+          maxLength: 72
+          minLength: 8
+      required:
+      - email
+      - name
+      - password
+      - role
+    CreateStationRequest:
+      type: object
+      description: Cadastro de estação (pluviômetro). Só pacotes de equipamentos cadastrados
+        são gravados pelo worker. O dono é sempre o dono do gateway.
+      properties:
+        hardwareId:
+          type: string
+          description: "Chip ID do pluviômetro, como vem no campo id do payload (normalizado\
+            \ para minúsculas). Não pode ser alterado depois."
+          example: 580db2
+          maxLength: 32
+          minLength: 1
+          pattern: "^[a-z0-9-]{1,32}$"
+        gatewayId:
+          type: string
+          format: uuid
+          description: "Gateway que recebe os dados desta estação (precisa ser do\
+            \ mesmo produtor). ADMIN pode escolher gateway de outro produtor: a estaç\
+            ão passa a ser desse produtor."
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome.
+          example: Pluviômetro do talhão 3
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: Descrição livre.
+          example: Ao lado da porteira
+          maxLength: 1000
+          minLength: 0
+        latitude:
+          type: number
+          format: double
+          description: Latitude em graus decimais (WGS84). Informe junto com a longitude.
+          example: -29.6842
+          maximum: 90
+          minimum: -90
+        longitude:
+          type: number
+          format: double
+          description: Longitude em graus decimais (WGS84). Informe junto com a latitude.
+          example: -53.8069
+          maximum: 180
+          minimum: -180
+        isPublic:
+          type: boolean
+          description: "Mostrar na área pública (só chuva e localização). Exige latitude/longitude.\
+            \ Padrão: false."
+          example: false
+      required:
+      - gatewayId
+      - hardwareId
+      - name
+    CreateGatewayRequest:
+      type: object
+      description: Cadastro de gateway. Só pacotes de equipamentos cadastrados são
+        gravados pelo worker.
+      properties:
+        hardwareId:
+          type: string
+          description: "Chip ID do gateway, como aparece no tópico MQTT (normalizado\
+            \ para minúsculas). Não pode ser alterado depois."
+          example: gt-570db4
+          maxLength: 32
+          minLength: 1
+          pattern: "^[a-z0-9-]{1,32}$"
+        name:
+          type: string
+          description: Nome.
+          example: Gateway da sede
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          description: Descrição livre.
+          example: Instalado no galpão principal
+          maxLength: 1000
+          minLength: 0
+        ownerId:
+          type: string
+          format: uuid
+          description: Produtor dono. Obrigatório para ADMIN; PRODUCER deve omitir
+            (o dono é ele mesmo).
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+      required:
+      - hardwareId
+      - name
+    LoginRequest:
+      type: object
+      description: Credenciais de login.
+      properties:
+        email:
+          type: string
+          description: Email do usuário.
+          example: maria@exemplo.com.br
+          minLength: 1
+        password:
+          type: string
+          description: Senha.
+          example: minhaSenha123
+          minLength: 1
+      required:
+      - email
+      - password
+    CurrentUserResponse:
+      type: object
+      description: Usuário logado.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador do usuário.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome.
+          example: Maria da Silva
+        email:
+          type: string
+          description: Email.
+          example: maria@exemplo.com.br
+        role:
+          type: string
+          description: Perfil (define as áreas que o front libera).
+          enum:
+          - ADMIN
+          - PRODUCER
+          example: PRODUCER
+        mustChangePassword:
+          type: boolean
+          description: "Se true, o front deve levar o usuário à troca de senha: o\
+            \ resto da API responde 403 PASSWORD_CHANGE_REQUIRED até a troca."
+          example: false
+      required:
+      - email
+      - id
+      - mustChangePassword
+      - name
+      - role
+    UpdateUserStatusRequest:
+      type: object
+      description: Ativa ou desativa um usuário. Desativar encerra imediatamente todas
+        as sessões dele.
+      properties:
+        active:
+          type: boolean
+          description: true = ativo; false = desativado (não consegue fazer login).
+          example: false
+      required:
+      - active
+    PageResponseUserResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PageResponseStationResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/StationResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    DeviceStatusResponse:
+      type: object
+      description: "Status do dispositivo (tópico status): bateria, sinal e uptime."
+      properties:
+        measuredAt:
+          type: string
+          format: date-time
+          description: Momento da medição.
+          example: 2026-11-10T12:00:00Z
+        receivedAt:
+          type: string
+          format: date-time
+          description: Quando o worker gravou.
+          example: 2026-11-10T12:00:02Z
+        gatewayId:
+          type: string
+          format: uuid
+          description: Gateway pelo qual o pacote chegou.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        batteryV:
+          type: number
+          format: float
+          description: Tensão da bateria (V).
+          example: 6.5
+        batteryPct:
+          type: integer
+          format: int32
+          description: Carga da bateria (%).
+          example: 74
+        rssiGatewayDbm:
+          type: integer
+          format: int32
+          description: RSSI do Wi-Fi do gateway (dBm).
+          example: -86
+        rssiStationDbm:
+          type: integer
+          format: int32
+          description: "RSSI do pluviômetro visto pelo gateway, via ESP-NOW (dBm)."
+          example: -60
+        uptimeGatewayS:
+          type: integer
+          format: int64
+          description: Uptime do gateway (s).
+          example: 86432
+        uptimeStationS:
+          type: integer
+          format: int64
+          description: Uptime do pluviômetro (s).
+          example: 85321
+      required:
+      - gatewayId
+      - measuredAt
+      - receivedAt
+    PageResponseDeviceStatusResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/DeviceStatusResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PageResponseReadingResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/ReadingResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    ReadingResponse:
+      type: object
+      description: Leitura de chuva enviada pelo pluviômetro (tópico dados).
+      properties:
+        measuredAt:
+          type: string
+          format: date-time
+          description: Momento da medição (relógio do dispositivo).
+          example: 2026-11-10T12:00:00Z
+        receivedAt:
+          type: string
+          format: date-time
+          description: Quando o worker gravou a leitura.
+          example: 2026-11-10T12:00:02Z
+        tipsPerMinute:
+          type: integer
+          format: int32
+          description: Basculadas por minuto.
+          example: 4
+        precipitationMm:
+          type: number
+          description: "Chuva no intervalo, em mm."
+          example: 0.8
+        seq:
+          type: integer
+          format: int64
+          description: Sequência do dispositivo (lacunas indicam pacotes perdidos;
+            zera no reboot).
+          example: 1
+      required:
+      - measuredAt
+      - precipitationMm
+      - receivedAt
+      - seq
+      - tipsPerMinute
+    PrecipitationPoint:
+      type: object
+      description: "Um ponto da série: chuva acumulada no bucket."
+      properties:
+        bucketStart:
+          type: string
+          format: date-time
+          description: "Início do bucket (ISO-8601, UTC), alinhado ao fuso pedido."
+          example: 2026-11-10T03:00:00Z
+        precipitationMm:
+          type: number
+          description: Chuva no bucket (mm).
+          example: 12.4
+        readingsCount:
+          type: integer
+          format: int64
+          description: Leituras recebidas no bucket (ajuda a perceber falhas de envio).
+          example: 1440
+      required:
+      - bucketStart
+      - precipitationMm
+      - readingsCount
+    PrecipitationSeriesResponse:
+      type: object
+      description: Série de chuva agregada. Buckets sem leitura não aparecem (sem
+        dado ≠ chuva zero).
+      properties:
+        stationId:
+          type: string
+          format: uuid
+          description: ID da estação.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        bucket:
+          type: string
+          description: Granularidade.
+          enum:
+          - HOUR
+          - DAY
+          - WEEK
+          - MONTH
+          example: DAY
+        timezone:
+          type: string
+          description: Fuso usado para alinhar os buckets.
+          example: America/Sao_Paulo
+        from:
+          type: string
+          format: date-time
+          description: Início do período consultado (inclusivo).
+          example: 2026-10-11T03:00:00Z
+        to:
+          type: string
+          format: date-time
+          description: Fim do período consultado (exclusivo).
+          example: 2026-11-10T03:00:00Z
+        totalMm:
+          type: number
+          description: Chuva total no período (mm).
+          example: 87.2
+        points:
+          type: array
+          description: Pontos em ordem cronológica.
+          items:
+            $ref: "#/components/schemas/PrecipitationPoint"
+      required:
+      - bucket
+      - from
+      - points
+      - stationId
+      - timezone
+      - to
+      - totalMm
+    PrecipitationTotals:
+      type: object
+      description: Chuva acumulada em janelas até agora (mm).
+      properties:
+        todayMm:
+          type: number
+          description: "Desde a meia-noite de hoje, no fuso pedido."
+          example: 3.2
+        last24hMm:
+          type: number
+          description: Últimas 24 horas.
+          example: 5.6
+        last7dMm:
+          type: number
+          description: Últimos 7 dias.
+          example: 21.0
+        last30dMm:
+          type: number
+          description: Últimos 30 dias.
+          example: 87.2
+      required:
+      - last24hMm
+      - last30dMm
+      - last7dMm
+      - todayMm
+    StationOverviewResponse:
+      type: object
+      description: "Resumo da estação para o painel: última leitura, último status\
+        \ e totais de chuva."
+      properties:
+        stationId:
+          type: string
+          format: uuid
+          description: ID da estação.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        timezone:
+          type: string
+          description: Fuso usado para "hoje".
+          example: America/Sao_Paulo
+        lastReading:
+          $ref: "#/components/schemas/ReadingResponse"
+          description: Última leitura recebida (null se nunca enviou).
+        lastStatus:
+          $ref: "#/components/schemas/DeviceStatusResponse"
+          description: Último status recebido (null se nunca enviou).
+        precipitation:
+          $ref: "#/components/schemas/PrecipitationTotals"
+          description: Totais de chuva.
+      required:
+      - precipitation
+      - stationId
+      - timezone
+    ConfigReportResponse:
+      type: object
+      description: Configuração reportada pelo dispositivo (tópico conf). Registrada
+        só quando algo muda.
+      properties:
+        reportedAt:
+          type: string
+          format: date-time
+          description: Quando foi recebida.
+          example: 2026-11-10T12:00:00Z
+        gatewayId:
+          type: string
+          format: uuid
+          description: Gateway pelo qual chegou.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        fwGateway:
+          type: string
+          description: Firmware do gateway.
+          example: 1.0.0
+        hwGateway:
+          type: string
+          description: Hardware do gateway.
+          example: "1.0"
+        fwStation:
+          type: string
+          description: Firmware do pluviômetro.
+          example: 1.0.0
+        hwStation:
+          type: string
+          description: Hardware do pluviômetro.
+          example: "1.0"
+        sendIntervalS:
+          type: integer
+          format: int32
+          description: Intervalo de envio (s).
+          example: 60
+        mmPerTip:
+          type: number
+          description: Milímetros por basculada.
+          example: 0.2
+      required:
+      - gatewayId
+      - reportedAt
+    PageResponseConfigReportResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/ConfigReportResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PublicStationSummary:
+      type: object
+      description: Estação pública (para o mapa). Sem dados do dono e sem chip ID.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID da estação.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome dado pelo dono.
+          example: Pluviômetro do talhão 3
+        latitude:
+          type: number
+          format: double
+          description: Latitude (WGS84).
+          example: -29.6842
+        longitude:
+          type: number
+          format: double
+          description: Longitude (WGS84).
+          example: -53.8069
+        lastReadingAt:
+          type: string
+          format: date-time
+          description: Última leitura recebida (null se nunca enviou).
+          example: 2026-11-10T12:00:00Z
+        last24hMm:
+          type: number
+          description: Chuva nas últimas 24 h (mm).
+          example: 5.6
+      required:
+      - id
+      - last24hMm
+      - latitude
+      - longitude
+      - name
+    PublicStationDetail:
+      type: object
+      description: "Detalhe de uma estação pública: localização e chuva acumulada.\
+        \ Sem dados do dono e sem chip ID."
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID da estação.
+          example: 019a6f3e-8b1c-7d2e-9f40-1a2b3c4d5e6f
+        name:
+          type: string
+          description: Nome dado pelo dono.
+          example: Pluviômetro do talhão 3
+        latitude:
+          type: number
+          format: double
+          description: Latitude (WGS84).
+          example: -29.6842
+        longitude:
+          type: number
+          format: double
+          description: Longitude (WGS84).
+          example: -53.8069
+        lastReadingAt:
+          type: string
+          format: date-time
+          description: Última leitura recebida (null se nunca enviou).
+          example: 2026-11-10T12:00:00Z
+        timezone:
+          type: string
+          description: Fuso usado para "hoje".
+          example: America/Sao_Paulo
+        precipitation:
+          $ref: "#/components/schemas/PrecipitationTotals"
+          description: Totais de chuva.
+      required:
+      - id
+      - latitude
+      - longitude
+      - name
+      - precipitation
+      - timezone
+    PageResponseGatewayResponse:
+      type: object
+      description: "Página de resultados. Parâmetros: page (0-based), size (padrã\
+        o 20, máx. 100), sort=campo,asc|desc."
+      properties:
+        content:
+          type: array
+          description: Itens da página.
+          items:
+            $ref: "#/components/schemas/GatewayResponse"
+        page:
+          type: integer
+          format: int32
+          description: Número da página (começa em 0).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Tamanho da página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Total de itens.
+          example: 42
+        totalPages:
+          type: integer
+          format: int32
+          description: Total de páginas.
+          example: 3
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      - totalPages
+    CsrfTokenResponse:
+      type: object
+      description: "Token CSRF. O mesmo valor fica no cookie XSRF-TOKEN (legível por\
+        \ JavaScript), reemitido a cada resposta."
+      properties:
+        headerName:
+          type: string
+          description: Header onde o token deve ser enviado em POST/PUT/PATCH/DELETE.
+          example: X-XSRF-TOKEN
+        token:
+          type: string
+          description: Valor do token.
+          example: 3f0e5a2c-1b4d-4e6f-8a9b-0c1d2e3f4a5b
+      required:
+      - headerName
+      - token
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      description: "Cookie de sessão (HttpOnly), criado no login."
+      name: SESSION
+      in: cookie
+    csrfHeader:
+      type: apiKey
+      description: "Token CSRF: valor do cookie XSRF-TOKEN. Obrigatório em POST/PUT/PATCH/DELETE."
+      name: X-XSRF-TOKEN
+      in: header
