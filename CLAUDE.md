@@ -86,12 +86,12 @@ src/
                             usuário, troca de senha)
     station/                precipitation-chart, series-panel, period-controls, date-range-picker,
                             rain-totals (+ useTotalsCoverage; `featured`/`windows` no painel), rain-calendar, device-summary, telemetry-tables,
-                            station-map, comparison, export-form,
+                            station-map, export-form,
                             station-tabs (abas Chuva/Leituras/Status/Configuração/Exportar, iguais no painel e no detalhe)
   pages/                    uma página por rota (ver mapa de rotas)
-    public/                 PublicLayout, HomePage, MapPage, StationsPage, StationDetailPage, ComparisonPage, AboutPage
+    public/                 PublicLayout, HomePage, MapPage, StationsPage, StationDetailPage, AboutPage
     auth/                   LoginPage, ChangePasswordPage
-    app/                    AppLayout, DashboardPage (escolhe pelo perfil), ComparisonPage, ExportPage, ProfilePage,
+    app/                    AppLayout, DashboardPage (escolhe pelo perfil), ExportPage, ProfilePage,
                             dashboard/ (AdminDashboard, ProducerDashboard),
                             stations/ gateways/ users/ (ListPage, NewPage, DetailPage, EditPage)
 ```
@@ -104,7 +104,6 @@ src/
 | `/mapa` | público | lista filtrável + mapa | idem |
 | `/estacoes` | público | tabela de estações públicas | idem |
 | `/estacoes/:id?tab=chuva\|exportar` | público | totais, série (hora/dia/semana/mês), mapa, **exportar série** | `GET /api/public/stations/{id}`, `/precipitation` |
-| `/comparativo` | público | compara 2–5 estações públicas | `/api/public/stations/{id}/precipitation` |
 | `/sobre` | público | estático | — |
 | `/entrar?redirect=` | sem sessão | login | `GET /api/auth/csrf`, `POST /api/auth/login` |
 | `/trocar-senha` | logado | troca obrigatória (`mustChangePassword`) | `PUT /api/auth/password` |
@@ -115,7 +114,6 @@ src/
 | `/minhas-estacoes/:id?tab=…` | idem | cabeçalho (editar/excluir) + abas Chuva / Leituras / Status / Configuração / **Exportar** (`StationTabs`, iguais ao painel) | `/overview`, `/precipitation`, `/readings`, `/status`, `/config-reports` |
 | `/minhas-estacoes/:id/editar` | idem | edição (chip ID imutável) | `PUT /api/stations/{id}` |
 | `/gateways`, `/novo`, `/:id` | idem | lista, cadastro, detalhe+edição+estações vinculadas | `/api/gateways` (+ `?gatewayId=` em stations) |
-| `/meu-comparativo` | idem | compara 2–5 estações (com cobertura) | `/precipitation` |
 | `/exportar?station=` | idem | **exportação em lote** (várias estações) | ver Exportação |
 | `/perfil` | idem | dados da conta + troca de senha | `PUT /api/auth/password` |
 | `/usuarios`, `/novo`, `/:id` | **ADMIN** | lista/filtros, cadastro (senha provisória), edição, ativar/desativar, redefinir senha | `/api/users/**` |
@@ -208,7 +206,7 @@ estações; link "Exportar" na lista de estações). Formulário `components/sta
 `DashboardPage` delega por perfil:
 - **ADMIN** (`dashboard/AdminDashboard.tsx`): não mostra dados de uma estação. Cards-link de usuários e estações (mesmo
   estilo dos cards do produtor), card "Acesso rápido" (`Item` com links para cadastros, usuários,
-  comparativo, exportação e mapa público) e mapa com todas as estações com coordenadas (`fitBounds`; popup com
+  exportação e mapa público) e mapa com todas as estações com coordenadas (`fitBounds`; popup com
   dono, gateway e visibilidade). Contagens de estações vêm de `stationsApi.listAll` (máx. 1000).
 - **PRODUCER** (`dashboard/ProducerDashboard.tsx`): estação exibida = `?station=` → favorita (`favorite` de
   `StationResponse`) → primeira por nome. Estrela ao lado do nome marca/desmarca (`PUT`/`DELETE
@@ -254,7 +252,7 @@ TODOs para o backend (o front já tem pontos de encaixe ou paliativos marcados):
 - [ ] **Resumo da rede para o painel** (`GET /api/dashboard`): totais, estações sem comunicação há 24 h,
       bateria baixa, gateways sem mensagem.
 - [ ] **Status por gateway** (última mensagem, RSSI Wi-Fi, uptime) — hoje só chega embutido no status da estação.
-- [ ] **Busca/lookup sem limite de 100**: selects de produtor, gateway e estação (e comparativo/exportação)
+- [ ] **Busca/lookup sem limite de 100**: selects de produtor, gateway e estação (e exportação)
       carregam no máximo 100 itens (`size` máx.). Precisa de `GET /api/users/lookup?role=PRODUCER&search=`
       e equivalentes, ou paginação por cursor.
 - [ ] **Recuperação de senha / convite por e-mail** (hoje só o ADMIN redefine senha provisória).
@@ -266,7 +264,7 @@ TODOs para o backend (o front já tem pontos de encaixe ou paliativos marcados):
 - [ ] **Ocorrências/alertas** (sem comunicação, bateria baixa, mm/basculada divergente, pacotes de
       equipamentos não cadastrados) e **auditoria** de ações administrativas.
 - [ ] **Calibração e manutenção**: mm/basculada aferido em laboratório × reportado, histórico de manutenções.
-- [ ] **Configurações da plataforma** (ex.: cobertura mínima para o comparativo ser conclusivo).
+- [ ] **Configurações da plataforma** (ex.: limites de cobertura usados nos badges).
 - [ ] **Previsão do tempo / previsto × registrado** (serviço meteorológico no servidor).
 - [ ] **Diagnóstico de ingestão MQTT** (últimos pacotes recebidos/rejeitados por tópico) para o ADMIN.
 - [ ] Dados extras de usuário: telefone, último login.

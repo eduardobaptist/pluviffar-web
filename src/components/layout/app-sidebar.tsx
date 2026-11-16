@@ -1,5 +1,5 @@
 import { Link, useMatch } from "react-router"
-import { ChevronsUpDown, CloudRain, Download, Globe, GitCompare, LayoutDashboard, LogOut, Router, User, Users } from "lucide-react"
+import { ChevronsUpDown, CloudRain, Download, Globe, LayoutDashboard, LogOut, Router, User, Users } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
@@ -25,7 +25,6 @@ const MAIN = [
   { to: "/painel", label: "Painel", icon: LayoutDashboard, exact: true },
   { to: "/minhas-estacoes", label: "Estações", icon: CloudRain },
   { to: "/gateways", label: "Gateways", icon: Router },
-  { to: "/meu-comparativo", label: "Comparativo", icon: GitCompare },
   { to: "/exportar", label: "Exportar dados", icon: Download },
 ] as const
 

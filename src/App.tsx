@@ -10,7 +10,6 @@ function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 }
 
 const AppLayout = page(() => import("@/pages/app/AppLayout"), "AppLayout")
-const AppComparisonPage = page(() => import("@/pages/app/ComparisonPage"), "AppComparisonPage")
 const DashboardPage = page(() => import("@/pages/app/DashboardPage"), "DashboardPage")
 const ExportPage = page(() => import("@/pages/app/ExportPage"), "ExportPage")
 const ProfilePage = page(() => import("@/pages/app/ProfilePage"), "ProfilePage")
@@ -27,7 +26,6 @@ const UserNewPage = page(() => import("@/pages/app/users/NewPage"), "UserNewPage
 const ChangePasswordPage = page(() => import("@/pages/auth/ChangePasswordPage"), "ChangePasswordPage")
 const LoginPage = page(() => import("@/pages/auth/LoginPage"), "LoginPage")
 const AboutPage = page(() => import("@/pages/public/AboutPage"), "AboutPage")
-const PublicComparisonPage = page(() => import("@/pages/public/ComparisonPage"), "PublicComparisonPage")
 const HomePage = page(() => import("@/pages/public/HomePage"), "HomePage")
 const MapPage = page(() => import("@/pages/public/MapPage"), "MapPage")
 const PublicLayout = page(() => import("@/pages/public/PublicLayout"), "PublicLayout")
@@ -57,7 +55,6 @@ export function App() {
             <Route path="mapa" element={<MapPage />} />
             <Route path="estacoes" element={<PublicStationsPage />} />
             <Route path="estacoes/:id" element={<PublicStationDetailPage />} />
-            <Route path="comparativo" element={<PublicComparisonPage />} />
             <Route path="sobre" element={<AboutPage />} />
           </Route>
 
@@ -79,7 +76,6 @@ export function App() {
               <Route path="novo" element={<GatewayNewPage />} />
               <Route path=":id" element={<GatewayDetailPage />} />
             </Route>
-            <Route path="meu-comparativo" element={<AppComparisonPage />} />
             <Route path="exportar" element={<ExportPage />} />
             <Route path="perfil" element={<ProfilePage />} />
             {/* Somente ADMIN */}

@@ -1,5 +1,5 @@
 import { Link } from "react-router"
-import { ChevronRight, CloudRain, Download, GitCompare, Globe, Map as MapIcon, Plus, Router, UserPlus, Users, type LucideIcon } from "lucide-react"
+import { ChevronRight, CloudRain, Download, Globe, Map as MapIcon, Plus, Router, UserPlus, Users, type LucideIcon } from "lucide-react"
 import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
@@ -33,7 +33,6 @@ const SHORTCUTS: { to: string; label: string; description: string; icon: LucideI
   { to: "/gateways/novo", label: "Novo gateway", description: "Vincular um gateway a um produtor", icon: Router },
   { to: "/minhas-estacoes/novo", label: "Nova estação", description: "Cadastrar pluviômetro", icon: Plus },
   { to: "/usuarios", label: "Usuários", description: "Ativar, desativar e redefinir senhas", icon: Users },
-  { to: "/meu-comparativo", label: "Comparativo", description: "Comparar 2 a 5 estações", icon: GitCompare },
   { to: "/exportar", label: "Exportar dados", description: "CSV/XLSX de várias estações", icon: Download },
   { to: "/mapa", label: "Mapa público", description: "Como a rede aparece para o público", icon: Globe },
 ]

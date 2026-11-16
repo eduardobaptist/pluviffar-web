@@ -13,7 +13,6 @@ const NAV = [
   { to: "/", label: "Início" },
   { to: "/mapa", label: "Mapa" },
   { to: "/estacoes", label: "Estações" },
-  { to: "/comparativo", label: "Comparativo" },
   { to: "/sobre", label: "Sobre" },
 ] as const
 

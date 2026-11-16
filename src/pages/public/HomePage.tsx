@@ -37,9 +37,6 @@ export function HomePage() {
                   Abrir o mapa <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/comparativo">Comparar estações</Link>
-              </Button>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 self-end">
