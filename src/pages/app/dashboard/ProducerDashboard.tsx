@@ -1,32 +1,31 @@
 import { Link } from "react-router"
-import { ArrowRight, ChevronDown, CloudRain, Star } from "lucide-react"
+import { CloudRain, Star } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { PageHeader } from "@/components/common/page-header"
 import { QueryError } from "@/components/common/query-error"
-import { StatusDot } from "@/components/common/status-badges"
-import { DeviceSummary } from "@/components/station/device-summary"
-import { RainTotals, useTotalsCoverage } from "@/components/station/rain-totals"
-import { SeriesPanel } from "@/components/station/series-panel"
+import { StationActions } from "@/components/station/station-actions"
+import { STATION_TABS, StationTabs, type StationTab } from "@/components/station/station-tabs"
 import { stationsApi } from "@/lib/api/endpoints"
 import type { Station } from "@/lib/api/types"
-import { fmtRelative, freshness } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useZodSearch } from "@/hooks/use-zod-search"
 import { useMe } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
 
-const searchSchema = z.object({ station: z.string().optional().catch(undefined) })
+const searchSchema = z.object({
+  station: z.string().optional().catch(undefined),
+  tab: z.enum(STATION_TABS).catch("chuva").default("chuva"),
+})
 
 function FavoriteButton({ station, pending, onToggle }: { station: Station; pending: boolean; onToggle: () => void }) {
-  const label = station.favorite ? "Desmarcar como favorita" : "Marcar como favorita"
+  const label = station.favorite ? "Desmarcar como favorita" : "Marcar como favorita. A estação aparecerá selecionada nessa tela ao entrar."
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -34,58 +33,21 @@ function FavoriteButton({ station, pending, onToggle }: { station: Station; pend
           <Star className={cn("size-6", station.favorite ? "fill-warning text-warning" : "text-muted-foreground")} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{station.favorite ? "Favorita — o painel abre nesta estação. Clique para desmarcar." : label}</TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   )
 }
 
-function StationOverview({ station }: { station: Station }) {
-  const [open, setOpen] = useState(false)
+/** Estação selecionada: as mesmas abas do detalhe. */
+function StationOverview({ station, tab, onTabChange }: { station: Station; tab: StationTab; onTabChange: (t: StationTab) => void }) {
   const ov = useFetch((signal) => stationsApi.overview(station.id, undefined, signal), [station.id], { intervalMs: 60_000 })
-  const coverage = useTotalsCoverage(station.id, station.sendIntervalS)
-  const last = ov.data?.lastReading?.measuredAt
-  return (
-    <div className="flex flex-col gap-4">
-      <RainTotals
-        totals={ov.data?.precipitation}
-        coverage={coverage}
-        neverReported={ov.data ? !ov.data.lastReading : false}
-        windows={["today", "last7d", "last30d"]}
-        featured
-      />
-      <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-3">
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between sm:w-fit">
-            <span className="flex min-w-0 items-center gap-2">
-              {ov.data && <StatusDot state={freshness(last, station.sendIntervalS)} />}
-              Mais informações
-              {ov.data && (
-                <span className="truncate font-normal text-muted-foreground">· {last ? `última leitura ${fmtRelative(last)}` : "nunca enviou"}</span>
-              )}
-            </span>
-            <ChevronDown className={cn("transition-transform", open && "rotate-180")} data-icon="inline-end" />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <DeviceSummary overview={ov.data} sendIntervalS={station.sendIntervalS} />
-        </CollapsibleContent>
-      </Collapsible>
-      <SeriesPanel
-        key={station.id}
-        stationId={station.id}
-        mode="private"
-        sendIntervalS={station.sendIntervalS}
-        initial="7"
-        chartClassName="h-[clamp(18rem,45svh,30rem)]"
-      />
-    </div>
-  )
+  return <StationTabs station={station} overview={ov.data} tab={tab} onTabChange={onTabChange} />
 }
 
-/** Painel do produtor: abre na estação favorita (ou na escolhida no seletor), com totais e série em destaque. */
+/** Painel do produtor: abre na estação favorita (ou na escolhida no seletor), com as mesmas abas do detalhe da estação. */
 export function ProducerDashboard() {
   const me = useMe()
-  const [{ station: selectedId }, setSearch] = useZodSearch(searchSchema)
+  const [{ station: selectedId, tab }, setSearch] = useZodSearch(searchSchema)
   const stations = useFetch((signal) => stationsApi.listAll({ sort: "name,asc" }, signal), [])
   const [pending, setPending] = useState(false)
   const list = stations.data ?? []
@@ -164,18 +126,22 @@ export function ProducerDashboard() {
         </Empty>
       ) : (
         <>
-          <div className="-mb-2 flex flex-wrap items-center justify-between gap-x-3">
+          <div className="-mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex min-w-0 items-center gap-1">
               <h2 className="truncate text-xl font-semibold">{selected.name}</h2>
               <FavoriteButton station={selected} pending={pending} onToggle={() => void toggleFavorite(selected)} />
             </div>
-            <Button asChild variant="link" className="px-0">
-              <Link to={`/minhas-estacoes/${selected.id}`}>
-                Detalhes da estação <ArrowRight data-icon="inline-end" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <StationActions
+                station={selected}
+                onDeleted={() => {
+                  stations.setData(list.filter((s) => s.id !== selected.id))
+                  setSearch({ station: undefined }, { replace: true })
+                }}
+              />
+            </div>
           </div>
-          <StationOverview key={selected.id} station={selected} />
+          <StationOverview key={selected.id} station={selected} tab={tab} onTabChange={(t) => setSearch({ station: selected.id, tab: t }, { replace: true })} />
         </>
       )}
     </>

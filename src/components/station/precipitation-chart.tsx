@@ -35,10 +35,10 @@ export function PrecipitationChart({ rows, bucket, className }: { rows: SeriesRo
   }))
   return (
     <ChartContainer config={config} className={className ?? "aspect-auto h-72 w-full"}>
-      <ComposedChart data={data} margin={{ top: 8, right: hasCoverage ? 0 : 8, left: 0, bottom: 0 }}>
+      <ComposedChart data={data} margin={{ top: 16, right: hasCoverage ? 0 : 8, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={16} tickMargin={8} />
-        <YAxis yAxisId="mm" tickLine={false} axisLine={false} width={44} unit=" mm" allowDecimals />
+        <YAxis yAxisId="mm" tickLine={false} axisLine={false} width={64} unit=" mm" allowDecimals />
         <YAxis yAxisId="nd" hide domain={[0, 40]} />
         {hasCoverage && <YAxis yAxisId="cov" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={40} unit="%" />}
         <ChartTooltip

@@ -33,8 +33,17 @@ export function allowedBuckets(days: number): Bucket[] {
   return (["HOUR", "DAY", "WEEK", "MONTH"] as Bucket[]).filter((b) => days <= MAX_DAYS[b] && !(b === "HOUR" && days > 31))
 }
 
-/** Seletor de período (atalhos + intervalo personalizado) e granularidade da série. */
-export function PeriodControls({ value, onChange }: { value: PeriodState; onChange: (v: PeriodState) => void }) {
+/** Seletor de período (atalhos + intervalo personalizado) e, opcionalmente, granularidade da série. */
+export function PeriodControls({
+  value,
+  onChange,
+  showBucket = true,
+}: {
+  value: PeriodState
+  onChange: (v: PeriodState) => void
+  /** false esconde o "Agrupar por" (ex.: calendário, que é sempre diário). */
+  showBucket?: boolean
+}) {
   const days = calendarDays(value.fromDay, value.toDay)
   const buckets = allowedBuckets(days)
   return (
@@ -69,23 +78,25 @@ export function PeriodControls({ value, onChange }: { value: PeriodState; onChan
           }}
         />
       )}
-      <Field orientation="horizontal" className="w-auto">
-        <FieldLabel htmlFor="bucket" className="text-muted-foreground">
-          Agrupar por
-        </FieldLabel>
-        <Select value={value.bucket} onValueChange={(b) => onChange({ ...value, bucket: b as Bucket })}>
-          <SelectTrigger id="bucket" size="sm" className="w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {buckets.map((b) => (
-              <SelectItem key={b} value={b}>
-                {BUCKET_LABEL[b]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
+      {showBucket && (
+        <Field orientation="horizontal" className="w-auto">
+          <FieldLabel htmlFor="bucket" className="text-muted-foreground">
+            Agrupar por
+          </FieldLabel>
+          <Select value={value.bucket} onValueChange={(b) => onChange({ ...value, bucket: b as Bucket })}>
+            <SelectTrigger id="bucket" size="sm" className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {buckets.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {BUCKET_LABEL[b]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
     </div>
   )
 }

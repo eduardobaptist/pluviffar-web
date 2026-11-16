@@ -71,6 +71,7 @@ src/
                             stationsApi.listAll pagina até 10×100, markFavorite/unmarkFavorite
     schemas.ts              schemas Zod dos formulários (limites do openapi)
     period.ts               períodos, buckets, completar lacunas, estimar cobertura, fatiar períodos
+    rain-calendar.ts        escala de cores do calendário (faixas fixas de mm/dia) e agrupamento por mês
     export.ts               exportação CSV/XLSX (coleta paginada + geração do arquivo)
     format.ts               formatação pt-BR (mm, datas no fuso, idade, uptime, atualidade)
   hooks/                    use-auth (AuthProvider: me/login/logout/401 → /entrar), use-fetch, use-zod-search,
@@ -84,8 +85,9 @@ src/
     form/                   form-field, api-errors, form-root-error, *-form (estação, gateway,
                             usuário, troca de senha)
     station/                precipitation-chart, series-panel, period-controls, date-range-picker,
-                            rain-totals (+ useTotalsCoverage; `featured`/`windows` no painel), device-summary, telemetry-tables,
-                            station-map, comparison, export-form
+                            rain-totals (+ useTotalsCoverage; `featured`/`windows` no painel), rain-calendar, device-summary, telemetry-tables,
+                            station-map, comparison, export-form,
+                            station-tabs (abas Chuva/Leituras/Status/Configuração/Exportar, iguais no painel e no detalhe)
   pages/                    uma página por rota (ver mapa de rotas)
     public/                 PublicLayout, HomePage, MapPage, StationsPage, StationDetailPage, ComparisonPage, AboutPage
     auth/                   LoginPage, ChangePasswordPage
@@ -106,11 +108,11 @@ src/
 | `/sobre` | público | estático | — |
 | `/entrar?redirect=` | sem sessão | login | `GET /api/auth/csrf`, `POST /api/auth/login` |
 | `/trocar-senha` | logado | troca obrigatória (`mustChangePassword`) | `PUT /api/auth/password` |
-| `/painel` | ADMIN | painel da rede: KPIs (usuários/ativos, estações, públicas/privadas, gateways), acesso rápido, mapa com todas as estações (zoom ajustado aos pontos) | `/stations` (todas as páginas), `/users`, `/gateways` |
-| `/painel?station=` | PRODUCER | painel da estação: abre na **favorita** (★, marcar/desmarcar no painel), troca de estação no dropdown; totais Hoje/7/30 dias em destaque (só % de cobertura), "Mais informações" (status do equipamento, recolhido), série com gráfico grande | `/stations`, `PUT/DELETE /stations/{id}/favorite`, `/overview`, `/precipitation` |
+| `/painel` | ADMIN | painel da rede: cards de usuários e estações, acesso rápido, mapa com todas as estações (zoom ajustado aos pontos) | `/stations` (todas as páginas), `/users` |
+| `/painel?station=&tab=` | PRODUCER | painel da estação: abre na **favorita** (★, marcar/desmarcar no painel), troca de estação no dropdown; mesmas abas do detalhe (`StationTabs`) | `/stations`, `PUT/DELETE /stations/{id}/favorite`, `/overview`, `/precipitation`, `/readings`, `/status`, `/config-reports` |
 | `/minhas-estacoes` | idem | lista com filtros (busca, gateway, visibilidade; ADMIN: dono, excluídas) | `GET /api/stations` |
 | `/minhas-estacoes/novo` | idem | cadastro | `POST /api/stations` |
-| `/minhas-estacoes/:id?tab=…` | idem | abas Chuva / Leituras / Status / Configuração / **Exportar** | `/overview`, `/precipitation`, `/readings`, `/status`, `/config-reports` |
+| `/minhas-estacoes/:id?tab=…` | idem | cabeçalho (editar/excluir) + abas Chuva / Leituras / Status / Configuração / **Exportar** (`StationTabs`, iguais ao painel) | `/overview`, `/precipitation`, `/readings`, `/status`, `/config-reports` |
 | `/minhas-estacoes/:id/editar` | idem | edição (chip ID imutável) | `PUT /api/stations/{id}` |
 | `/gateways`, `/novo`, `/:id` | idem | lista, cadastro, detalhe+edição+estações vinculadas | `/api/gateways` (+ `?gatewayId=` em stations) |
 | `/meu-comparativo` | idem | compara 2–5 estações (com cobertura) | `/precipitation` |
@@ -170,6 +172,17 @@ cobertura no lugar do aviso "acumulado parcial"): cobertura estimada por `useTot
 HOUR (24 h) e uma DAY (30 dias). Faixas do badge: ≥95% boa, ≥70% parcial, abaixo disso baixa.
 No gráfico, bucket sem dado vira um traço cinza "Sem dados" na base — nunca uma barra de 0 mm.
 
+## Calendário pluviométrico
+
+O `SeriesPanel` (painel do produtor e aba Chuva dos detalhes, logado e público) tem as abas **Gráfico** e
+**Calendário**, com o mesmo período. O "Agrupar por" é só do gráfico (`PeriodControls showBucket`); o calendário
+pede sempre a série **DAY** (máx. `MAX_DAYS.DAY` = 1100 dias; acima disso mostra aviso). `components/station/rain-calendar.tsx`:
+um bloco por mês (dom–sáb) com total do mês; cada dia colorido pela faixa de chuva (`lib/rain-calendar.ts →
+RAIN_THRESHOLDS`, limites **fixos** em mm para a mesma cor valer entre estações/períodos; tokens `--rain-1…6` +
+`-foreground` no `index.css`), 0 mm com borda neutra, "Sem dados" hachurado, ponto âmbar/vermelho para cobertura
+< 95% / < 70%. Totais do mês somam só o medido (`null` se nada) e levam `*` quando parciais. Detalhe do dia numa
+barra fixa (`sticky top-14`) por hover/foco/toque.
+
 ## Exportação CSV / XLSX (feature nova)
 
 Onde: aba **Exportar** do detalhe da estação (logado e público) e página **/exportar** (várias
@@ -193,17 +206,22 @@ estações; link "Exportar" na lista de estações). Formulário `components/sta
 ## Painel (`/painel`)
 
 `DashboardPage` delega por perfil:
-- **ADMIN** (`dashboard/AdminDashboard.tsx`): não mostra dados de uma estação. KPIs com link (usuários + ativos,
-  estações, públicas/privadas, gateways), card "Acesso rápido" (`Item` com links para cadastros, usuários,
+- **ADMIN** (`dashboard/AdminDashboard.tsx`): não mostra dados de uma estação. Cards-link de usuários e estações (mesmo
+  estilo dos cards do produtor), card "Acesso rápido" (`Item` com links para cadastros, usuários,
   comparativo, exportação e mapa público) e mapa com todas as estações com coordenadas (`fitBounds`; popup com
   dono, gateway e visibilidade). Contagens de estações vêm de `stationsApi.listAll` (máx. 1000).
 - **PRODUCER** (`dashboard/ProducerDashboard.tsx`): estação exibida = `?station=` → favorita (`favorite` de
   `StationResponse`) → primeira por nome. Estrela ao lado do nome marca/desmarca (`PUT`/`DELETE
   /api/stations/{id}/favorite`; uma por usuário, marcar substitui a anterior — o front atualiza a lista local
   e fixa `?station=` para a tela não pular). O dropdown só aparece com 2+ estações e mostra ★ na favorita.
-  Ordem: totais Hoje/7/30 dias (`RainTotals featured`), "Mais informações" (`Collapsible` recolhido com o
-  `DeviceSummary`; o gatilho já mostra a atualidade da última leitura) e `SeriesPanel` com gráfico de altura
-  `clamp(18rem, 45svh, 30rem)` para caber inteiro na primeira dobra. Sem mapa.
+  À direita do nome, Editar/Excluir (`components/station/station-actions.tsx`, os mesmos do detalhe; ao excluir,
+  a estação sai da lista local e o painel volta para a favorita/primeira). Abaixo, o mesmo `StationTabs` do detalhe (aba em `?tab=`). Sem mapa na aba Chuva.
+
+**`StationTabs`** (`components/station/station-tabs.tsx`, painel do produtor e `/minhas-estacoes/:id`): aba **Chuva**
+com totais Hoje/7/30 dias (`RainTotals featured`), "Mais informações" (`Collapsible` recolhido com o
+`DeviceSummary`; o gatilho já mostra a atualidade da última leitura) e `SeriesPanel` (gráfico de altura
+`clamp(18rem, 45svh, 30rem)` / calendário); abas Leituras, Status, Configuração (config atual, localização,
+histórico) e Exportar. O `overview` é buscado pela página (o cabeçalho também usa) e passado ao componente.
 
 ## Design system
 

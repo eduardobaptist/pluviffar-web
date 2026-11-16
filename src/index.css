@@ -16,6 +16,18 @@
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
     --color-rain: var(--rain);
+    --color-rain-1: var(--rain-1);
+    --color-rain-1-foreground: var(--rain-1-foreground);
+    --color-rain-2: var(--rain-2);
+    --color-rain-2-foreground: var(--rain-2-foreground);
+    --color-rain-3: var(--rain-3);
+    --color-rain-3-foreground: var(--rain-3-foreground);
+    --color-rain-4: var(--rain-4);
+    --color-rain-4-foreground: var(--rain-4-foreground);
+    --color-rain-5: var(--rain-5);
+    --color-rain-5-foreground: var(--rain-5-foreground);
+    --color-rain-6: var(--rain-6);
+    --color-rain-6-foreground: var(--rain-6-foreground);
     --shadow-card: var(--shadow-card);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -64,6 +76,7 @@
  *  --rain     série de chuva nos gráficos (= primary, mantém a história em verde)
  *  --success  cobertura boa / dispositivo online (chart-5)
  *  --warning  cobertura parcial / dado atrasado (chart-4)
+ *  --rain-1…6 escala sequencial do calendário pluviométrico (pouca → muita chuva; + -foreground)
  */
 :root {
     --radius: 0.5rem;
@@ -95,6 +108,18 @@
     --success-foreground: #0b5e42;
     --warning: #f49f1e;
     --warning-foreground: #7a4a06;
+    --rain-1: #e3f6ec;
+    --rain-1-foreground: #161616;
+    --rain-2: #b4e8cc;
+    --rain-2-foreground: #161616;
+    --rain-3: #6fcfa5;
+    --rain-3-foreground: #161616;
+    --rain-4: #1b8a7e;
+    --rain-4-foreground: #ffffff;
+    --rain-5: #2f6fb8;
+    --rain-5-foreground: #ffffff;
+    --rain-6: #3a3f99;
+    --rain-6-foreground: #ffffff;
     --sidebar: #fcfcfc;
     --sidebar-foreground: #717171;
     --sidebar-primary: #0d623b;
@@ -135,6 +160,18 @@
     --success-foreground: #7fe3bd;
     --warning: #f6b04a;
     --warning-foreground: #f8c983;
+    --rain-1: #173a2b;
+    --rain-1-foreground: #e4e8ef;
+    --rain-2: #1d5c40;
+    --rain-2-foreground: #e4e8ef;
+    --rain-3: #23845c;
+    --rain-3-foreground: #ffffff;
+    --rain-4: #22a89c;
+    --rain-4-foreground: #0b1414;
+    --rain-5: #5b97f8;
+    --rain-5-foreground: #0b1220;
+    --rain-6: #a5adff;
+    --rain-6-foreground: #11132a;
     --sidebar: #121212;
     --sidebar-foreground: #a1a1a1;
     --sidebar-primary: #0d623b;

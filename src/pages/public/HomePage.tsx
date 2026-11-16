@@ -63,7 +63,7 @@ export function HomePage() {
 
       <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 md:px-8">
         <div className="flex items-end justify-between">
-          <h2 className="text-2xl font-semibold">Mapa da rede pública</h2>
+          <h2 className="text-2xl font-semibold">Mapa de estações públicas</h2>
           <Button asChild variant="link">
             <Link to="/mapa">Tela cheia →</Link>
           </Button>

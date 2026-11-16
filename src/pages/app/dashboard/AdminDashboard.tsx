@@ -1,26 +1,27 @@
 import { Link } from "react-router"
 import { ChevronRight, CloudRain, Download, GitCompare, Globe, Map as MapIcon, Plus, Router, UserPlus, Users, type LucideIcon } from "lucide-react"
-import { useMemo, type ReactNode } from "react"
+import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/common/page-header"
 import { QueryError } from "@/components/common/query-error"
 import { StationMap, type MapPoint } from "@/components/station/station-map"
-import { gatewaysApi, stationsApi, usersApi } from "@/lib/api/endpoints"
+import { stationsApi, usersApi } from "@/lib/api/endpoints"
 import { useMe } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
 
-function Kpi({ icon: Icon, label, value, hint, to }: { icon: LucideIcon; label: string; value: number | undefined; hint?: ReactNode; to: string }) {
+function Kpi({ icon: Icon, label, value, to }: { icon: LucideIcon; label: string; value: number | undefined; to: string }) {
   return (
     <Link to={to} className="group rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
-      <Card size="sm" className="h-full transition-shadow group-hover:shadow-md">
+      <Card className="h-full transition-shadow group-hover:shadow-md">
         <CardHeader>
-          <CardDescription className="flex items-center gap-2">
-            <Icon className="size-4" aria-hidden /> {label}
+          <CardDescription className="flex items-center gap-2 text-base font-medium text-foreground md:text-lg">
+            <Icon className="size-5 text-muted-foreground" aria-hidden /> {label}
           </CardDescription>
-          <CardTitle className="text-3xl tabular-nums">{value ?? <Skeleton className="h-8 w-12" />}</CardTitle>
-          {hint && <CardDescription className="text-xs">{hint}</CardDescription>}
+          <CardTitle className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">
+            {value ?? <Skeleton className="h-10 w-16" />}
+          </CardTitle>
         </CardHeader>
       </Card>
     </Link>
@@ -42,11 +43,8 @@ export function AdminDashboard() {
   const me = useMe()
   const stations = useFetch((signal) => stationsApi.listAll({ sort: "name,asc" }, signal), [])
   const users = useFetch(() => usersApi.list({ size: 1 }), [])
-  const activeUsers = useFetch(() => usersApi.list({ active: true, size: 1 }), [])
-  const gateways = useFetch(() => gatewaysApi.list({ size: 1 }), [])
 
   const list = stations.data
-  const publicCount = list?.filter((s) => s.isPublic).length
   const points = useMemo<MapPoint[]>(
     () =>
       (list ?? [])
@@ -64,32 +62,18 @@ export function AdminDashboard() {
 
   return (
     <>
-      <PageHeader title={`Olá, ${me.name.split(" ")[0]}`} description="Visão geral da rede PluvIFFar." />
+      <PageHeader title={`Olá, ${me.name.split(" ")[0]}`} description="Visão geral." />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi
-          icon={Users}
-          label="Usuários"
-          value={users.data?.totalElements}
-          hint={activeUsers.data ? `${activeUsers.data.totalElements} ativos` : undefined}
-          to="/usuarios"
-        />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Kpi icon={Users} label="Usuários" value={users.data?.totalElements} to="/usuarios" />
         <Kpi icon={CloudRain} label="Estações" value={list?.length} to="/minhas-estacoes" />
-        <Kpi
-          icon={Globe}
-          label="Estações públicas"
-          value={publicCount}
-          hint={list ? `${list.length - (publicCount ?? 0)} privadas` : undefined}
-          to="/minhas-estacoes?visibility=public"
-        />
-        <Kpi icon={Router} label="Gateways" value={gateways.data?.totalElements} to="/gateways" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <MapIcon className="size-4" aria-hidden /> Mapa da rede
+              <MapIcon className="size-4" aria-hidden /> Mapa de estações
             </CardTitle>
             <CardDescription>
               {list
