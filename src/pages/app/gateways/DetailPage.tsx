@@ -39,7 +39,7 @@ export function GatewayDetailPage() {
           g && (
             <ConfirmAction
               title={`Excluir “${g.name}”?`}
-              description="Exclusão lógica: os dados são mantidos e o chip ID fica livre. Não é permitido enquanto houver estações ativas vinculadas."
+              description="Os dados já recebidos continuam guardados."
               confirmLabel="Excluir"
               onConfirm={async () => {
                 try {

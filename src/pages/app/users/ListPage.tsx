@@ -1,17 +1,22 @@
 import { Link } from "react-router"
-import { Plus } from "lucide-react"
+import { Menu, Pencil, Plus, UserCheck, UserX } from "lucide-react"
+import { toast } from "sonner"
 import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ConfirmAction } from "@/components/common/confirm-action"
 import { DataPagination } from "@/components/common/data-pagination"
 import { PageHeader } from "@/components/common/page-header"
 import { QueryError } from "@/components/common/query-error"
 import { SearchInput } from "@/components/common/search-input"
 import { usersApi } from "@/lib/api/endpoints"
+import type { User } from "@/lib/api/types"
+import { useMe } from "@/hooks/use-auth"
 import { useZodSearch } from "@/hooks/use-zod-search"
 import { fmtDate, ROLE_LABEL } from "@/lib/format"
 import { useFetch } from "@/hooks/use-fetch"
@@ -35,11 +40,22 @@ export function UsersListPage() {
       ...(s.status !== "all" ? { active: s.status === "active" } : {}),
     }
   const q = useFetch(() => usersApi.list(filters), [JSON.stringify(filters)], { keepPrevious: true })
+  const me = useMe()
+
+  async function toggleStatus(u: User) {
+    try {
+      const updated = await usersApi.setStatus(u.id, !u.active)
+      toast.success(updated.active ? `${u.name} ativado.` : `${u.name} desativado.`)
+      q.reload()
+    } catch (e) {
+      toast.error((e as Error).message)
+      throw e
+    }
+  }
   return (
     <>
       <PageHeader
         title="Usuários"
-        description="Não há auto-cadastro: produtores e administradores são criados aqui."
         actions={
           <Button asChild>
             <Link to="/usuarios/novo">
@@ -79,6 +95,9 @@ export function UsersListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>E-mail</TableHead>
                   <TableHead>Perfil</TableHead>
@@ -90,20 +109,53 @@ export function UsersListPage() {
                 {!q.data &&
                   [0, 1, 2].map((i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={5}>
+                      <TableCell colSpan={6}>
                         <Skeleton className="h-5" />
                       </TableCell>
                     </TableRow>
                   ))}
                 {q.data?.content.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       Nenhum usuário encontrado.
                     </TableCell>
                   </TableRow>
                 )}
                 {q.data?.content.map((u) => (
                   <TableRow key={u.id}>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" aria-label={`Ações de ${u.name}`}>
+                            <Menu />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/usuarios/${u.id}`}>
+                              <Pencil /> Editar
+                            </Link>
+                          </DropdownMenuItem>
+                          {u.id !== me.id && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <ConfirmAction
+                                title={u.active ? `Desativar ${u.name}?` : `Ativar ${u.name}?`}
+                                description={u.active ? "O usuário perde o acesso imediatamente." : "O usuário volta a poder entrar."}
+                                confirmLabel={u.active ? "Desativar" : "Ativar"}
+                                destructive={u.active}
+                                onConfirm={() => toggleStatus(u)}
+                                trigger={
+                                  <DropdownMenuItem variant={u.active ? "destructive" : "default"} onSelect={(e) => e.preventDefault()}>
+                                    {u.active ? <UserX /> : <UserCheck />} {u.active ? "Desativar" : "Ativar"}
+                                  </DropdownMenuItem>
+                                }
+                              />
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                     <TableCell>
                       <Link to={`/usuarios/${u.id}`} className="font-medium underline-offset-4 hover:underline">
                         {u.name}

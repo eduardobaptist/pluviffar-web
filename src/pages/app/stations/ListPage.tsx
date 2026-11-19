@@ -1,5 +1,5 @@
 import { Link } from "react-router"
-import { CloudRain, Download, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
+import { CloudRain, Download, Eye, Menu, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
@@ -70,7 +70,6 @@ export function StationsListPage() {
     <>
       <PageHeader
         title="Estações"
-        description="Pluviômetros cadastrados. Só pacotes MQTT de equipamentos cadastrados são gravados."
         actions={
           <>
             <Button asChild variant="outline">
@@ -148,15 +147,15 @@ export function StationsListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
                   <TableHead>Estação</TableHead>
                   <TableHead>Chip ID</TableHead>
                   <TableHead>Gateway</TableHead>
                   {isAdmin && <TableHead>Produtor</TableHead>}
                   <TableHead>Visibilidade</TableHead>
                   <TableHead>Config. reportada</TableHead>
-                  <TableHead className="w-10">
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -177,6 +176,46 @@ export function StationsListPage() {
                 )}
                 {q.data?.content.map((st) => (
                   <TableRow key={st.id} className={st.deletedAt ? "opacity-60" : undefined}>
+                    <TableCell>
+                      {!st.deletedAt && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label={`Ações de ${st.name}`}>
+                              <Menu />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/minhas-estacoes/${st.id}`}>
+                                <Eye /> Ver dados
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link to={`/minhas-estacoes/${st.id}/editar`}>
+                                <Pencil /> Editar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link to={`/minhas-estacoes/${st.id}?tab=exportar`}>
+                                <Download /> Exportar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <ConfirmAction
+                              title={`Excluir “${st.name}”?`}
+                              description="As leituras já recebidas continuam guardadas."
+                              confirmLabel="Excluir"
+                              onConfirm={() => remove(st)}
+                              trigger={
+                                <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 /> Excluir
+                                </DropdownMenuItem>
+                              }
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {st.deletedAt ? (
                         <span className="font-medium">{st.name}</span>
@@ -199,46 +238,6 @@ export function StationsListPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{fmtDateTime(st.configReportedAt)}</TableCell>
-                    <TableCell>
-                      {!st.deletedAt && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" aria-label={`Ações de ${st.name}`}>
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link to={`/minhas-estacoes/${st.id}`}>
-                                <Eye /> Ver dados
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/minhas-estacoes/${st.id}/editar`}>
-                                <Pencil /> Editar
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/minhas-estacoes/${st.id}?tab=exportar`}>
-                                <Download /> Exportar
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <ConfirmAction
-                              title={`Excluir “${st.name}”?`}
-                              description="As leituras gravadas são mantidas e o chip ID fica livre para novo cadastro. A estação sai da área pública."
-                              confirmLabel="Excluir"
-                              onConfirm={() => remove(st)}
-                              trigger={
-                                <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
-                                  <Trash2 /> Excluir
-                                </DropdownMenuItem>
-                              }
-                            />
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

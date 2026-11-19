@@ -17,7 +17,7 @@ export function StationActions({ station, onDeleted }: { station: Pick<Station, 
       </Button>
       <ConfirmAction
         title={`Excluir “${station.name}”?`}
-        description="Exclusão lógica: as leituras são mantidas e o chip ID fica livre para novo cadastro. A estação sai da área pública."
+        description="As leituras já recebidas continuam guardadas."
         confirmLabel="Excluir"
         onConfirm={async () => {
           try {

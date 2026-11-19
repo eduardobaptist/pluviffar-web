@@ -1,6 +1,4 @@
-import { Info } from "lucide-react"
 import { useSearchParams } from "react-router"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/common/page-header"
@@ -16,14 +14,7 @@ export function ExportPage() {
   const q = useFetch(() => stationsApi.list({ size: 100, sort: "name,asc" }), [])
   return (
     <>
-      <PageHeader title="Exportar dados" description="Baixe a chuva, as leituras brutas ou o status de uma ou várias estações em CSV ou Excel (XLSX)." />
-      <Alert>
-        <Info />
-        <AlertDescription>
-          O arquivo é gerado no seu navegador a partir da API. Leituras e status são buscados página a página (até 93 dias por requisição), então períodos longos
-          podem levar alguns segundos. Intervalos sem leitura saem como <strong>SEM_DADOS</strong> — nunca como chuva zero.
-        </AlertDescription>
-      </Alert>
+      <PageHeader title="Exportar dados" description="CSV ou Excel de uma ou várias estações." />
       {q.error ? (
         <QueryError error={q.error} onRetry={q.reload} />
       ) : (

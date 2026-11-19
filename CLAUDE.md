@@ -18,7 +18,7 @@ npm run dev        # Vite em :3000 (origem liberada no CORS da API), proxy /api 
 npm run build      # tsc -b + vite build
 npm run typecheck  # só tsc
 npm run lint       # oxlint
-npm test           # vitest (lógica pura: séries, cobertura, CSV/XLSX)
+npm test           # vitest (lógica pura: séries, cobertura, CSV/XLSX, distâncias)
 ```
 
 ## Stack
@@ -74,8 +74,9 @@ src/
     rain-calendar.ts        escala de cores do calendário (faixas fixas de mm/dia) e agrupamento por mês
     export.ts               exportação CSV/XLSX (coleta paginada + geração do arquivo)
     format.ts               formatação pt-BR (mm, datas no fuso, idade, uptime, atualidade)
+    geo.ts                  distância haversine e estações mais próximas
   hooks/                    use-auth (AuthProvider: me/login/logout/401 → /entrar), use-fetch, use-zod-search,
-                            use-debounced
+                            use-debounced, use-geolocation (pede a posição ao montar; retry)
   components/
     ui/                     shadcn (gerado)
     routing/                guards (RequireAuth, RequireAdmin, RedirectIfAuthed), NotFound, ErrorBoundary
@@ -84,6 +85,8 @@ src/
                             status-badges (atualidade/cobertura), search-input, owner-select
     form/                   form-field, api-errors, form-root-error, *-form (estação, gateway,
                             usuário, troca de senha)
+    home/                   rain-gauge-animation (SVG + keyframes `.pluvio-*` no index.css, respeita reduced-motion),
+                            nearby-stations
     station/                precipitation-chart, series-panel, period-controls, date-range-picker,
                             rain-totals (+ useTotalsCoverage; `featured`/`windows` no painel), rain-calendar, device-summary, telemetry-tables,
                             station-map, export-form,
@@ -100,10 +103,10 @@ src/
 
 | Rota | Acesso | Conteúdo | Endpoints |
 | --- | --- | --- | --- |
-| `/` | público | hero, KPIs, mapa, cards das estações públicas | `GET /api/public/stations` |
+| `/` | público | hero (texto + pluviômetro de báscula animado), estações mais próximas (geolocalização pedida ao abrir; sem permissão → atualizadas recentemente), mapa | `GET /api/public/stations` |
 | `/mapa` | público | lista filtrável + mapa | idem |
 | `/estacoes` | público | tabela de estações públicas | idem |
-| `/estacoes/:id?tab=chuva\|exportar` | público | totais, série (hora/dia/semana/mês), mapa, **exportar série** | `GET /api/public/stations/{id}`, `/precipitation` |
+| `/estacoes/:id?tab=chuva\|localizacao\|exportar` | público | mesmo padrão do `StationTabs`: aba Chuva (totais Hoje/7/30 em destaque + série), Localização (mapa) e **Exportar série** | `GET /api/public/stations/{id}`, `/precipitation` |
 | `/sobre` | público | estático | — |
 | `/entrar?redirect=` | sem sessão | login | `GET /api/auth/csrf`, `POST /api/auth/login` |
 | `/trocar-senha` | logado | troca obrigatória (`mustChangePassword`) | `PUT /api/auth/password` |
@@ -163,8 +166,10 @@ O front (`lib/period.ts → buildSeriesTable`):
 - gera todos os buckets do período no fuso (`@date-fns/tz`) e marca os ausentes como `mm: null`;
 - estima `esperadas = duração do bucket (recortada ao período) ÷ sendIntervalS` da estação e
   `cobertura = recebidas ÷ esperadas` (máx. 100%);
-- sem `sendIntervalS` (estação que nunca reportou `conf`, ou área pública) → cobertura `null` e o
-  badge mostra "cobertura —" com explicação.
+- sem `sendIntervalS` (estação que nunca reportou `conf`) → cobertura `null` e o badge mostra "cobertura —" com explicação.
+- **área pública**: a API não expõe o intervalo de envio, então a área pública **não mostra cobertura nem atualidade**
+  (sem badges de cobertura/online; `RainTotals showCoverage={false}`, `SeriesPanel mode="public"`, exportação sem
+  colunas de cobertura — `situacao` só `COM_DADOS|SEM_DADOS`). A regra "sem dado ≠ chuva zero" continua valendo.
 Totais do overview (hoje/24 h/7/30 dias; o painel do produtor mostra só hoje/7/30, em destaque, com o badge de
 cobertura no lugar do aviso "acumulado parcial"): cobertura estimada por `useTotalsCoverage` com uma série
 HOUR (24 h) e uma DAY (30 dias). Faixas do badge: ≥95% boa, ≥70% parcial, abaixo disso baixa.
@@ -190,7 +195,7 @@ estações; link "Exportar" na lista de estações). Formulário `components/sta
 - **Conjuntos**: série agregada (HOUR/DAY/WEEK/MONTH, com leituras recebidas/esperadas, cobertura e
   situação `COMPLETO|PARCIAL|SEM_DADOS|COBERTURA_DESCONHECIDA`), leituras brutas (com
   `pacotes_perdidos_antes` calculado pelas lacunas de `seq`) e status (bateria, RSSI, uptime).
-  A área pública só exporta a série agregada (endpoints `/api/public`).
+  A área pública só exporta a série agregada (endpoints `/api/public`), sem leituras esperadas/cobertura.
 - **Coleta**: período fatiado pelos limites da API (93 dias para readings/status e HOUR; 1100 para DAY);
   readings/status paginam com `size=100` e 4 requisições em paralelo, com barra de progresso e
   cancelamento (`AbortController`). Teto de 200 mil linhas por estação (`MAX_RAW_ROWS`); limites de

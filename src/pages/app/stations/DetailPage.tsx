@@ -1,19 +1,16 @@
 import { Link, useNavigate, useParams } from "react-router"
 import { ChevronLeft, SearchX } from "lucide-react"
 import { z } from "zod"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/common/page-header"
-import { FreshnessBadge } from "@/components/common/status-badges"
 import { QueryError } from "@/components/common/query-error"
 import { StationActions } from "@/components/station/station-actions"
 import { STATION_TABS, StationTabs } from "@/components/station/station-tabs"
 import { isApiError } from "@/lib/api/client"
 import { stationsApi } from "@/lib/api/endpoints"
 import { useZodSearch } from "@/hooks/use-zod-search"
-import { useMe } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
 
 const searchSchema = z.object({ tab: z.enum(STATION_TABS).catch("chuva").default("chuva") })
@@ -21,7 +18,6 @@ const searchSchema = z.object({ tab: z.enum(STATION_TABS).catch("chuva").default
 export function StationDetailPage() {
   const id = useParams().id!
   const [{ tab }, setSearch] = useZodSearch(searchSchema)
-  const me = useMe()
   const navigate = useNavigate()
   const st = useFetch(() => stationsApi.get(id), [id])
   const ov = useFetch(st.data ? (signal) => stationsApi.overview(id, undefined, signal) : null, [id], { intervalMs: 60_000 })
@@ -55,16 +51,6 @@ export function StationDetailPage() {
       </Button>
       <PageHeader
         title={s?.name ?? <Skeleton className="h-9 w-64" />}
-        description={
-          s && (
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-mono">{s.hardwareId}</span>·<span>gateway {s.gateway.name}</span>
-              {me.role === "ADMIN" && <>· <span>{s.owner.name}</span></>}
-              {s.isPublic ? <Badge>Pública</Badge> : <Badge variant="secondary">Privada</Badge>}
-              <FreshnessBadge at={ov.data?.lastReading?.measuredAt} sendIntervalS={s.sendIntervalS} />
-            </span>
-          )
-        }
         actions={
           s && <StationActions station={s} onDeleted={() => navigate("/minhas-estacoes")} />
         }

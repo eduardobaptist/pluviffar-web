@@ -5,7 +5,7 @@ import { useMemo } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group"
@@ -101,7 +101,6 @@ export function StationForm({
       <Card>
         <CardHeader>
           <CardTitle>{station ? "Dados da estação" : "Nova estação"}</CardTitle>
-          <CardDescription>O dono da estação é sempre o dono do gateway escolhido.</CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup>
@@ -110,7 +109,6 @@ export function StationForm({
                 control={form.control}
                 name="hardwareId"
                 label="Chip ID do pluviômetro"
-                description={station ? "Imutável. Para trocar o equipamento, exclua e cadastre outra estação." : "Campo “id” do payload MQTT (minúsculas, números e hífen)."}
               >
                 {(f) => <Input {...f} disabled={!!station} className="font-mono" placeholder="ex.: 580db2" autoComplete="off" />}
               </FormField>
@@ -119,11 +117,7 @@ export function StationForm({
                 name="gatewayId"
                 label="Gateway"
                 description={
-                  ownerChanges ? (
-                    <span className="text-warning-foreground">Este gateway é de {selectedGateway!.owner.name}: a estação passará a ser desse produtor.</span>
-                  ) : (
-                    "Gateway que recebe os dados desta estação."
-                  )
+                  ownerChanges ? <span className="text-warning-foreground">A estação passará a ser de {selectedGateway!.owner.name}, dono deste gateway.</span> : undefined
                 }
               >
                 {({ value, onChange, id, "aria-invalid": invalid }) => (
@@ -151,7 +145,7 @@ export function StationForm({
             <FormField control={form.control} name="name" label="Nome">
               {(f) => <Input {...f} placeholder="ex.: Sede — Lavoura 3" />}
             </FormField>
-            <FormField control={form.control} name="description" label="Descrição" description="Opcional. Até 1000 caracteres.">
+            <FormField control={form.control} name="description" label="Descrição (opcional)">
               {(f) => <Textarea {...f} rows={3} />}
             </FormField>
 
@@ -188,7 +182,7 @@ export function StationForm({
               name="isPublic"
               orientation="horizontal"
               label="Mostrar na área pública"
-              description="Exibe só o nome, a localização e a chuva — nunca seus dados nem o chip ID. Exige latitude e longitude."
+              description="Qualquer visitante vê o nome, a localização e a chuva."
             >
               {({ value, onChange, id, "aria-invalid": invalid }) => <Switch id={id} checked={value} onCheckedChange={onChange} aria-invalid={invalid} />}
             </FormField>

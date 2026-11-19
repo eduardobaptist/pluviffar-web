@@ -1,10 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Link, useNavigate, useParams } from "react-router"
 import { ChevronLeft, KeyRound, UserCheck, UserX } from "lucide-react"
+import type { ReactNode } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import type { z } from "zod"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
@@ -19,7 +19,8 @@ import { FormField } from "@/components/form/form-field"
 import { FormRootError } from "@/components/form/form-root-error"
 import { UserForm } from "@/components/form/user-form"
 import { usersApi } from "@/lib/api/endpoints"
-import { fmtDateTime, ROLE_LABEL } from "@/lib/format"
+import type { User } from "@/lib/api/types"
+import { fmtDateTime } from "@/lib/format"
 import { resetPasswordSchema } from "@/lib/schemas"
 import { useMe } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
@@ -30,7 +31,7 @@ function ResetPasswordCard({ userId, onDone }: { userId: string; onDone: () => v
     <Card>
       <CardHeader>
         <CardTitle>Redefinir senha</CardTitle>
-        <CardDescription>Define uma senha provisória (troca obrigatória no próximo login) e encerra todas as sessões do usuário.</CardDescription>
+        <CardDescription>O usuário deverá trocá-la no próximo acesso.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -65,6 +66,33 @@ function ResetPasswordCard({ userId, onDone }: { userId: string; onDone: () => v
   )
 }
 
+function Row({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b py-2.5 text-sm last:border-0">
+      <span className="text-muted-foreground">{k}</span>
+      <span className="text-right font-medium">{children}</span>
+    </div>
+  )
+}
+
+function ToggleStatus({ user: u, onToggle }: { user: User; onToggle: () => Promise<void> }) {
+  return (
+    <ConfirmAction
+      title={u.active ? `Desativar ${u.name}?` : `Ativar ${u.name}?`}
+      description={u.active ? "O usuário perde o acesso imediatamente." : "O usuário volta a poder entrar."}
+      confirmLabel={u.active ? "Desativar" : "Ativar"}
+      destructive={u.active}
+      onConfirm={onToggle}
+      trigger={
+        <Button size="sm" variant={u.active ? "destructive" : "outline"}>
+          {u.active ? <UserX data-icon="inline-start" /> : <UserCheck data-icon="inline-start" />}
+          {u.active ? "Desativar" : "Ativar"}
+        </Button>
+      }
+    />
+  )
+}
+
 export function UserDetailPage() {
   const id = useParams().id!
   const me = useMe()
@@ -95,38 +123,11 @@ export function UserDetailPage() {
       </Button>
       <PageHeader
         title={u?.name ?? <Skeleton className="h-9 w-56" />}
-        description={
-          u && (
-            <span className="flex flex-wrap items-center gap-2">
-              {ROLE_LABEL[u.role]} · criado em {fmtDateTime(u.createdAt)}
-              {u.active ? <Badge>Ativo</Badge> : <Badge variant="destructive">Desativado</Badge>}
-              {u.mustChangePassword && <Badge variant="outline">Senha provisória</Badge>}
-            </span>
-          )
-        }
-        actions={
-          u &&
-          !isSelf && (
-            <ConfirmAction
-              title={u.active ? `Desativar ${u.name}?` : `Ativar ${u.name}?`}
-              description={u.active ? "O usuário não conseguirá entrar e todas as sessões dele serão encerradas imediatamente." : "O usuário voltará a poder entrar na plataforma."}
-              confirmLabel={u.active ? "Desativar" : "Ativar"}
-              destructive={u.active}
-              onConfirm={toggleStatus}
-              trigger={
-                <Button variant={u.active ? "destructive" : "outline"}>
-                  {u.active ? <UserX data-icon="inline-start" /> : <UserCheck data-icon="inline-start" />}
-                  {u.active ? "Desativar" : "Ativar"}
-                </Button>
-              }
-            />
-          )
-        }
       />
       {!u ? (
         <Skeleton className="h-96 rounded-xl" />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
           <UserForm
             key={u.updatedAt}
             user={u}
@@ -137,6 +138,14 @@ export function UserDetailPage() {
               q.setData(updated)
               toast.success("Usuário atualizado.")
             }}
+            action={!isSelf && <ToggleStatus user={u} onToggle={toggleStatus} />}
+            info={
+              <>
+                {u.mustChangePassword && <Row k="Senha">Provisória (troca pendente)</Row>}
+                <Row k="Criado em">{fmtDateTime(u.createdAt)}</Row>
+                <Row k="Última alteração">{fmtDateTime(u.updatedAt)}</Row>
+              </>
+            }
           />
           <ResetPasswordCard userId={id} onDone={q.reload} />
         </div>

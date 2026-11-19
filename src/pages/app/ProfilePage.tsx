@@ -1,5 +1,5 @@
 import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { PageHeader } from "@/components/common/page-header"
 import { ChangePasswordForm } from "@/components/form/change-password-form"
@@ -10,7 +10,7 @@ export function ProfilePage() {
   const me = useMe()
   return (
     <>
-      <PageHeader title="Meu perfil" description="Nome, e-mail e perfil são alterados pelo administrador." />
+      <PageHeader title="Meu perfil" />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -42,7 +42,6 @@ export function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Alterar senha</CardTitle>
-            <CardDescription>Suas outras sessões serão encerradas; esta continua ativa.</CardDescription>
           </CardHeader>
           <CardContent>
             <ChangePasswordForm onDone={() => void toast.success("Senha alterada.")} />

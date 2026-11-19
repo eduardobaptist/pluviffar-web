@@ -1,10 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LogIn, RotateCw, ServerCrash } from "lucide-react"
+import { ArrowLeft, LogIn, RotateCw, ServerCrash } from "lucide-react"
+import { Link } from "react-router"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -36,8 +37,12 @@ export function LoginPage() {
     <AuthLayout>
       <Card>
         <CardHeader>
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 w-fit text-muted-foreground">
+            <Link to="/">
+              <ArrowLeft data-icon="inline-start" /> Voltar ao site
+            </Link>
+          </Button>
           <CardTitle className="text-xl">Entrar</CardTitle>
-          <CardDescription>Acesso de produtores e administradores.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {offline && (
@@ -45,7 +50,7 @@ export function LoginPage() {
               <ServerCrash />
               <AlertTitle>Servidor indisponível</AlertTitle>
               <AlertDescription>
-                Não foi possível falar com a API. Verifique se ela está rodando e se o proxy aponta para ela.
+                Não foi possível conectar ao servidor. Tente de novo em instantes.
                 <Button size="sm" variant="outline" className="mt-2" onClick={() => void refresh()} disabled={loading}>
                   {loading ? <Spinner data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />} Tentar de novo
                 </Button>
@@ -66,7 +71,7 @@ export function LoginPage() {
                 Entrar
               </Button>
               <FieldDescription className="text-center">
-                Não há auto-cadastro: as contas são criadas pelo administrador. Esqueceu a senha? Peça ao administrador para redefini-la.
+                Esqueceu a senha? Fale com o administrador.
               </FieldDescription>
             </FieldGroup>
           </form>

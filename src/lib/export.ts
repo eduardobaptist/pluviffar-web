@@ -127,10 +127,29 @@ function wall(iso: string | Date, tz: string): Date {
   return new Date(Date.UTC(z.getFullYear(), z.getMonth(), z.getDate(), z.getHours(), z.getMinutes(), z.getSeconds()))
 }
 
+/** Área pública: sem cobertura (a API pública não expõe o intervalo de envio). */
+function publicSeriesSheet(st: ExportStation, parts: PrecipitationSeries[], tz: string): Sheet {
+  const rows: Cell[][] = []
+  for (const s of parts)
+    for (const r of buildSeriesTable(s, null).rows) rows.push([st.name, wall(r.start, tz), r.mm, r.readings, r.mm == null ? "SEM_DADOS" : "COM_DADOS"])
+  return {
+    name: st.name,
+    columns: [
+      { header: "estacao", type: "string" },
+      { header: `inicio_bucket (${tz})`, type: "datetime" },
+      { header: "chuva_mm", type: "number" },
+      { header: "leituras_recebidas", type: "integer" },
+      { header: "situacao", type: "string" },
+    ],
+    rows,
+  }
+}
+
 function seriesSheet(req: ExportRequest, st: ExportStation, parts: PrecipitationSeries[], tz: string): Sheet {
+  if (req.publicMode) return publicSeriesSheet(st, parts, tz)
   const rows: Cell[][] = []
   for (const s of parts) {
-    const t = buildSeriesTable(s, req.publicMode ? null : st.sendIntervalS)
+    const t = buildSeriesTable(s, st.sendIntervalS)
     for (const r of t.rows) {
       const situacao =
         r.mm == null ? "SEM_DADOS" : r.coverage == null ? "COBERTURA_DESCONHECIDA" : r.coverage < 99.5 ? "PARCIAL" : "COMPLETO"
@@ -332,7 +351,7 @@ export function exportMeta(req: ExportRequest): [string, string][] {
     ["Estações", req.stations.map((s) => s.name).join(", ")],
     [
       "Aviso",
-      "Buckets sem leitura aparecem com chuva vazia e situação SEM_DADOS: ausência de pacote NÃO significa chuva zero. Cobertura < 100% indica acumulado parcial.",
+      `Buckets sem leitura aparecem com chuva vazia e situação SEM_DADOS: ausência de pacote NÃO significa chuva zero.${req.publicMode ? "" : " Cobertura < 100% indica acumulado parcial."}`,
     ],
   ]
 }

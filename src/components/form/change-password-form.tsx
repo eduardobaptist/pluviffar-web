@@ -34,7 +34,7 @@ export function ChangePasswordForm({ onDone, submitLabel = "Alterar senha" }: { 
         <FormField control={form.control} name="currentPassword" label="Senha atual">
           {(f) => <Input {...f} type="password" autoComplete="current-password" />}
         </FormField>
-        <FormField control={form.control} name="newPassword" label="Nova senha" description="De 8 a 72 caracteres, diferente da atual.">
+        <FormField control={form.control} name="newPassword" label="Nova senha" description="Mínimo de 8 caracteres.">
           {(f) => <Input {...f} type="password" autoComplete="new-password" />}
         </FormField>
         <FormField control={form.control} name="confirm" label="Confirme a nova senha">

@@ -1,5 +1,5 @@
 import { Link } from "react-router"
-import { MoreHorizontal, Pencil, Plus, Router, Trash2 } from "lucide-react"
+import { Menu, Pencil, Plus, Router, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
@@ -62,7 +62,6 @@ export function GatewaysListPage() {
     <>
       <PageHeader
         title="Gateways"
-        description="Versões são as reportadas pelo dispositivo via MQTT (tópico conf)."
         actions={
           <Button asChild>
             <Link to="/gateways/novo">
@@ -108,14 +107,14 @@ export function GatewaysListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
                   <TableHead>Gateway</TableHead>
                   <TableHead>Chip ID</TableHead>
                   {isAdmin && <TableHead>Produtor</TableHead>}
                   <TableHead>FW / HW</TableHead>
                   <TableHead>Config. reportada</TableHead>
-                  <TableHead className="w-10">
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -137,6 +136,36 @@ export function GatewaysListPage() {
                 {q.data?.content.map((g) => (
                   <TableRow key={g.id} className={g.deletedAt ? "opacity-60" : undefined}>
                     <TableCell>
+                      {!g.deletedAt && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label={`Ações de ${g.name}`}>
+                              <Menu />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/gateways/${g.id}`}>
+                                <Pencil /> Ver / editar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <ConfirmAction
+                              title={`Excluir “${g.name}”?`}
+                              description="Os dados já recebidos continuam guardados."
+                              confirmLabel="Excluir"
+                              onConfirm={() => remove(g)}
+                              trigger={
+                                <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 /> Excluir
+                                </DropdownMenuItem>
+                              }
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {g.deletedAt ? (
                         <span className="flex items-center gap-2 font-medium">
                           {g.name} <Badge variant="destructive">Excluído</Badge>
@@ -153,36 +182,6 @@ export function GatewaysListPage() {
                       {g.fwVersion ?? "—"} / {g.hwVersion ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{fmtDateTime(g.configReportedAt)}</TableCell>
-                    <TableCell>
-                      {!g.deletedAt && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" aria-label={`Ações de ${g.name}`}>
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link to={`/gateways/${g.id}`}>
-                                <Pencil /> Ver / editar
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <ConfirmAction
-                              title={`Excluir “${g.name}”?`}
-                              description="Exclusão lógica: os dados são mantidos e o chip ID fica livre. Não é permitido enquanto houver estações ativas vinculadas."
-                              confirmLabel="Excluir"
-                              onConfirm={() => remove(g)}
-                              trigger={
-                                <DropdownMenuItem variant="destructive" onSelect={(e) => e.preventDefault()}>
-                                  <Trash2 /> Excluir
-                                </DropdownMenuItem>
-                              }
-                            />
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

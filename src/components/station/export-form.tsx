@@ -63,8 +63,8 @@ const schema = z
 type Values = z.infer<typeof schema>
 
 const FORMATS = [
-  { value: "xlsx", label: "Excel (.xlsx)", desc: "Uma aba por estação + aba “Sobre” com período, fuso e avisos.", icon: FileSpreadsheet },
-  { value: "csv", label: "CSV", desc: "Tabela única (coluna “estacao”), UTF-8 com BOM.", icon: FileText },
+  { value: "xlsx", label: "Excel (.xlsx)", desc: "Uma aba por estação.", icon: FileSpreadsheet },
+  { value: "csv", label: "CSV", desc: "Uma tabela com todas as estações.", icon: FileText },
 ] as const
 
 /**
@@ -182,11 +182,7 @@ export function ExportForm({
                         <FieldContent>
                           <FieldTitle>{DATASET_LABEL[d]}</FieldTitle>
                           <FieldDescription>
-                            {d === "series"
-                              ? "Chuva somada por hora/dia/semana/mês, com cobertura."
-                              : d === "readings"
-                                ? "Cada pacote recebido (mm, basculadas, seq)."
-                                : "Bateria, sinal (RSSI) e uptime."}
+                            {d === "series" ? "Chuva por hora, dia, semana ou mês." : d === "readings" ? "Cada leitura recebida da estação." : "Bateria, sinal e tempo ligado."}
                           </FieldDescription>
                         </FieldContent>
                         <RadioGroupItem value={d} id={`exp-ds-${d}`} />
@@ -200,7 +196,7 @@ export function ExportForm({
         )}
 
         <div className="grid gap-6 sm:grid-cols-2">
-          <FormField control={form.control} name="range" label="Período" description="Dias inteiros no fuso America/Sao_Paulo; o dia de hoje vai até agora.">
+          <FormField control={form.control} name="range" label="Período">
             {({ value, onChange, id, "aria-invalid": invalid }) => <DateRangePicker id={id} value={value} onChange={onChange} invalid={invalid} className="w-full" />}
           </FormField>
           {dataset === "series" && (
@@ -275,7 +271,7 @@ export function ExportForm({
         <div className="flex flex-col gap-2">
           <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} />
           <p className="text-sm text-muted-foreground">
-            {progress.label} ({progress.done}/{progress.total} requisições)
+            {progress.label} ({progress.done}/{progress.total})
           </p>
         </div>
       )}

@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Save } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -65,7 +65,6 @@ export function GatewayForm({
       <Card>
         <CardHeader>
           <CardTitle>{gateway ? "Dados do gateway" : "Novo gateway"}</CardTitle>
-          <CardDescription>ESP8266 que recebe dos pluviômetros (ESP-NOW) e publica no broker MQTT.</CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup>
@@ -74,7 +73,6 @@ export function GatewayForm({
                 control={form.control}
                 name="hardwareId"
                 label="Chip ID do gateway"
-                description={gateway ? "Imutável. Para trocar o equipamento, exclua e cadastre outro." : "Segmento do tópico pluviffar/{chip-id}/… (minúsculas, números e hífen)."}
               >
                 {(f) => <Input {...f} disabled={!!gateway} className="font-mono" placeholder="ex.: gw-fw01" autoComplete="off" />}
               </FormField>
@@ -82,7 +80,7 @@ export function GatewayForm({
                 {(f) => <Input {...f} placeholder="ex.: Galpão sede" />}
               </FormField>
             </div>
-            <FormField control={form.control} name="description" label="Descrição" description="Opcional. Até 1000 caracteres.">
+            <FormField control={form.control} name="description" label="Descrição (opcional)">
               {(f) => <Textarea {...f} rows={3} />}
             </FormField>
             {isAdmin && (
@@ -90,7 +88,7 @@ export function GatewayForm({
                 control={form.control}
                 name="ownerId"
                 label="Produtor dono"
-                description={gateway ? "Trocar o dono transfere o gateway e todas as estações dele." : "Produtor ativo responsável pelo gateway."}
+                description={gateway ? "As estações deste gateway também passam para o novo dono." : undefined}
               >
                 {({ value, onChange, id, "aria-invalid": invalid }) => <OwnerSelect id={id} value={value} onChange={onChange} invalid={invalid} />}
               </FormField>

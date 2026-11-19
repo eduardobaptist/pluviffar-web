@@ -17,7 +17,7 @@ export function StationNewPage() {
           <ChevronLeft data-icon="inline-start" /> Estações
         </Link>
       </Button>
-      <PageHeader title="Cadastrar estação" description="Registre o chip ID do pluviômetro e vincule a um gateway." />
+      <PageHeader title="Cadastrar estação" />
       <StationForm
         isAdmin={me.role === "ADMIN"}
         cancelTo={() => void navigate("/minhas-estacoes")}

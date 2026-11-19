@@ -1,112 +1,78 @@
 import { Link } from "react-router"
-import { ArrowRight, CloudRain, MapPinned, Radio } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FreshnessBadge } from "@/components/common/status-badges"
 import { QueryError } from "@/components/common/query-error"
+import { NearbyStations } from "@/components/home/nearby-stations"
+import { RainGaugeAnimation } from "@/components/home/rain-gauge-animation"
 import { StationMap, type MapPoint } from "@/components/station/station-map"
 import { useFetch } from "@/hooks/use-fetch"
+import { useGeolocation } from "@/hooks/use-geolocation"
 import { publicApi } from "@/lib/api/endpoints"
-import { fmt24h, fmtRelative, hasDataWithin } from "@/lib/format"
+import { fmt24h } from "@/lib/format"
+
+/** Palavra em destaque no título: marca-texto em faixa baixa (tokens, legível nos dois temas). */
+function Highlight({ children, tone }: { children: React.ReactNode; tone: "field" | "home" }) {
+  return (
+    <span
+      className={
+        tone === "field"
+          ? "box-decoration-clone bg-linear-to-t from-rain-2 from-40% to-transparent to-40% -mx-0.5 px-1"
+          : "box-decoration-clone bg-linear-to-t from-chart-2/35 from-40% to-transparent to-40% -mx-0.5 px-1"
+      }
+    >
+      {children}
+    </span>
+  )
+}
 
 export function HomePage() {
   const q = useFetch(() => publicApi.list(), [], { intervalMs: 5 * 60_000 })
-  const stations = useMemo(() => q.data ?? [], [q.data])
+  const geo = useGeolocation()
   const points = useMemo<MapPoint[]>(
-    () => stations.map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public" })),
-    [stations],
+    () => (q.data ?? []).map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public" })),
+    [q.data],
   )
-  const active = stations.filter((s) => hasDataWithin(s.lastReadingAt, 24)).length
 
   return (
     <>
-      <section className="border-b bg-muted/40">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 md:grid-cols-[1.4fr_1fr] md:px-8 md:py-20">
+      <section className="overflow-hidden border-b bg-muted/40">
+        <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 md:grid-cols-[1.25fr_1fr] md:gap-10 md:px-8 md:py-20">
           <div className="flex flex-col gap-5">
             <p className="text-sm font-medium text-muted-foreground">Instituto Federal Farroupilha</p>
-            <h1 className="text-4xl leading-[1.1] font-bold tracking-[-0.02em] md:text-5xl">Chuva medida no campo, com transparência sobre cada lacuna.</h1>
-            <p className="max-w-xl text-lg text-muted-foreground">
-              O PluvIFFar reúne pluviômetros instalados em propriedades rurais e mostra quanto choveu — e quando o equipamento não estava enviando dados.
+            <h1 className="text-4xl leading-[1.15] font-bold tracking-[-0.02em] sm:text-5xl md:text-[2.75rem] lg:text-5xl">
+              Chuva medida no <Highlight tone="field">campo</Highlight>,<br className="hidden lg:block" /> sem sair de <Highlight tone="home">casa</Highlight>.
+            </h1>
+            <p className="max-w-lg text-lg text-pretty text-muted-foreground">
+              Nosso <strong className="font-semibold text-foreground">pluviômetro automático</strong> mede cada milímetro sozinho e manda tudo para o seu celular. Saiba
+              quanto choveu na lavoura, na hora, de onde estiver.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button asChild size="lg">
                 <Link to="/mapa">
                   Abrir o mapa <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/sobre">Como funciona</Link>
+              </Button>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 self-end">
-            <Card>
-              <CardHeader>
-                <CloudRain className="size-5 text-muted-foreground" />
-                <CardTitle className="text-3xl tabular-nums">{!q.data ? <Skeleton className="h-9 w-12" /> : stations.length}</CardTitle>
-                <CardDescription>estações públicas</CardDescription>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <Radio className="size-5 text-muted-foreground" />
-                <CardTitle className="text-3xl tabular-nums">{!q.data ? <Skeleton className="h-9 w-12" /> : active}</CardTitle>
-                <CardDescription>com dados nas últimas 24 h</CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
+          <RainGaugeAnimation className="max-w-[20rem] sm:max-w-[23rem] md:max-w-[26rem]" />
         </div>
       </section>
 
-      <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 md:px-8">
+      {!q.error && <NearbyStations stations={q.data} geo={geo} onRetry={geo.retry} />}
+
+      <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 md:px-8 md:pb-14">
         <div className="flex items-end justify-between">
           <h2 className="text-2xl font-semibold">Mapa de estações públicas</h2>
-          <Button asChild variant="link">
+          <Button asChild variant="link" className="px-0">
             <Link to="/mapa">Tela cheia →</Link>
           </Button>
         </div>
         {q.error ? <QueryError error={q.error} onRetry={q.reload} /> : !q.data ? <Skeleton className="h-[420px] w-full rounded-xl" /> : <StationMap points={points} />}
-      </section>
-
-      <section className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-14 md:px-8">
-        <h2 className="text-2xl font-semibold">Últimos registros</h2>
-        {!q.data ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-36 rounded-xl" />
-            ))}
-          </div>
-        ) : stations.length === 0 ? (
-          <Empty className="border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <MapPinned />
-              </EmptyMedia>
-              <EmptyTitle>Ainda não há estações públicas</EmptyTitle>
-              <EmptyDescription>Os produtores escolhem quais estações aparecem aqui.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {stations.map((s) => (
-              <Link key={s.id} to={`/estacoes/${s.id}`} className="group">
-                <Card className="h-full transition-shadow group-hover:shadow-md">
-                  <CardHeader>
-                    <CardTitle className="truncate">{s.name}</CardTitle>
-                    <CardDescription>Atualizado {fmtRelative(s.lastReadingAt)}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-muted-foreground">Últimas 24 h</div>
-                    <div className="text-2xl font-semibold tabular-nums">{fmt24h(s.last24hMm, s.lastReadingAt)}</div>
-                  </CardContent>
-                  <CardFooter>
-                    <FreshnessBadge at={s.lastReadingAt} />
-                  </CardFooter>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
       </section>
     </>
   )

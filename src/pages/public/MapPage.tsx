@@ -2,15 +2,14 @@ import { Link } from "react-router"
 import { Search } from "lucide-react"
 import { useMemo, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FreshnessBadge } from "@/components/common/status-badges"
 import { QueryError } from "@/components/common/query-error"
 import { StationMap, type MapPoint } from "@/components/station/station-map"
 import { useFetch } from "@/hooks/use-fetch"
 import { publicApi } from "@/lib/api/endpoints"
-import { fmt24h } from "@/lib/format"
+import { fmt24h, fmtRelative } from "@/lib/format"
 
 export function MapPage() {
   const q = useFetch(() => publicApi.list(), [], { intervalMs: 5 * 60_000 })
@@ -39,11 +38,10 @@ export function MapPage() {
                 <Link to={`/estacoes/${s.id}`}>
                   <ItemContent>
                     <ItemTitle>{s.name}</ItemTitle>
-                    <ItemDescription>24 h: {fmt24h(s.last24hMm, s.lastReadingAt)}</ItemDescription>
+                    <ItemDescription>
+                      24 h: {fmt24h(s.last24hMm, s.lastReadingAt)} · atualizado {fmtRelative(s.lastReadingAt)}
+                    </ItemDescription>
                   </ItemContent>
-                  <ItemActions>
-                    <FreshnessBadge at={s.lastReadingAt} />
-                  </ItemActions>
                 </Link>
               </Item>
             ))}

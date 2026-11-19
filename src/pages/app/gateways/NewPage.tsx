@@ -17,7 +17,7 @@ export function GatewayNewPage() {
           <ChevronLeft data-icon="inline-start" /> Gateways
         </Link>
       </Button>
-      <PageHeader title="Cadastrar gateway" description="Só pacotes MQTT de equipamentos cadastrados são gravados." />
+      <PageHeader title="Cadastrar gateway" />
       <GatewayForm
         isAdmin={me.role === "ADMIN"}
         onCancel={() => void navigate("/gateways")}

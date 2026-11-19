@@ -6,7 +6,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageHeader } from "@/components/common/page-header"
-import { FreshnessBadge } from "@/components/common/status-badges"
 import { QueryError } from "@/components/common/query-error"
 import { useFetch } from "@/hooks/use-fetch"
 import { publicApi } from "@/lib/api/endpoints"
@@ -40,21 +39,20 @@ export function PublicStationsPage() {
                 <TableHead>Estação</TableHead>
                 <TableHead className="text-right">Últimas 24 h</TableHead>
                 <TableHead>Última leitura</TableHead>
-                <TableHead>Situação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!q.data &&
                 [0, 1, 2].map((i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={4}>
+                    <TableCell colSpan={3}>
                       <Skeleton className="h-5" />
                     </TableCell>
                   </TableRow>
                 ))}
               {!!q.data && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
                     Nenhuma estação encontrada.
                   </TableCell>
                 </TableRow>
@@ -68,9 +66,6 @@ export function PublicStationsPage() {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{fmt24h(s.last24hMm, s.lastReadingAt)}</TableCell>
                   <TableCell className="text-muted-foreground">{fmtDateTime(s.lastReadingAt)}</TableCell>
-                  <TableCell>
-                    <FreshnessBadge at={s.lastReadingAt} />
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

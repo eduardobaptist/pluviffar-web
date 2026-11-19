@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Save } from "lucide-react"
+import type { ReactNode } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -17,17 +18,24 @@ import { FormRootError } from "./form-root-error"
 
 type Values = z.infer<typeof createUserSchema>
 
-/** Cadastro (com senha provisória) ou edição (nome, e-mail, perfil) de usuário. */
+/**
+ * Cadastro (com senha provisória) ou edição (nome, e-mail, perfil) de usuário.
+ * `action`: canto do cabeçalho (ex.: ativar/desativar); `info`: informações somente leitura abaixo dos campos.
+ */
 export function UserForm({
   user,
   isSelf,
   onSubmit,
   onCancel,
+  action,
+  info,
 }: {
   user?: User
   isSelf?: boolean
   onSubmit: (v: Values) => Promise<unknown>
   onCancel: () => void
+  action?: ReactNode
+  info?: ReactNode
 }) {
   const form = useForm<Values>({
     // Na edição a senha não é enviada (redefinição tem formulário próprio).
@@ -49,19 +57,18 @@ export function UserForm({
       <Card>
         <CardHeader>
           <CardTitle>{user ? "Dados do usuário" : "Novo usuário"}</CardTitle>
-          <CardDescription>
-            {user ? "Trocar o perfil encerra as sessões do usuário." : "O usuário recebe uma senha provisória e precisa trocá-la no primeiro login."}
-          </CardDescription>
+          {user && <CardDescription>Trocar o perfil encerra as sessões do usuário.</CardDescription>}
+          {action && <CardAction>{action}</CardAction>}
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <FormField control={form.control} name="name" label="Nome">
               {(f) => <Input {...f} autoComplete="off" />}
             </FormField>
-            <FormField control={form.control} name="email" label="E-mail" description="Único; usado para login.">
+            <FormField control={form.control} name="email" label="E-mail">
               {(f) => <Input {...f} type="email" autoComplete="off" />}
             </FormField>
-            <FormField control={form.control} name="role" label="Perfil" description={isSelf ? "Você não pode alterar o próprio perfil." : "Produtor gerencia só os próprios gateways e estações; administrador vê e gerencia tudo."}>
+            <FormField control={form.control} name="role" label="Perfil" description={isSelf ? "Você não pode alterar o próprio perfil." : undefined}>
               {({ value, onChange, id, "aria-invalid": invalid }) => (
                 <Select value={value} onValueChange={(v) => onChange(v as Role)} disabled={isSelf}>
                   <SelectTrigger id={id} aria-invalid={invalid} className="w-full">
@@ -78,12 +85,13 @@ export function UserForm({
               )}
             </FormField>
             {!user && (
-              <FormField control={form.control} name="password" label="Senha provisória" description="De 8 a 72 caracteres. Repasse ao usuário por um canal seguro.">
+              <FormField control={form.control} name="password" label="Senha provisória" description="O usuário troca a senha no primeiro acesso.">
                 {(f) => <Input {...f} type="password" autoComplete="new-password" />}
               </FormField>
             )}
             <FormRootError errors={form.formState.errors} />
           </FieldGroup>
+          {info && <div className="mt-6 border-t pt-2">{info}</div>}
         </CardContent>
         <CardFooter className="justify-end gap-2 border-t">
           <Button type="button" variant="outline" onClick={onCancel}>

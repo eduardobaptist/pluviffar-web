@@ -29,7 +29,7 @@ export function CoverageBadge({ value, className }: { value: number | null | und
   if (value == null)
     return (
       <Badge variant="outline" className={cn("text-muted-foreground", className)} title="Intervalo de envio da estação desconhecido — não é possível estimar a cobertura.">
-        cobertura —
+        —
       </Badge>
     )
   const tone =
