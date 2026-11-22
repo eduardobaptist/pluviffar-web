@@ -72,7 +72,7 @@ src/
     schemas.ts              schemas Zod dos formulários (limites do openapi)
     period.ts               períodos, buckets, completar lacunas, estimar cobertura, fatiar períodos
     rain-calendar.ts        escala de cores do calendário (faixas fixas de mm/dia) e agrupamento por mês
-    export.ts               exportação CSV/XLSX (coleta paginada + geração do arquivo)
+    export.ts               exportação CSV/XLSX (agregados de chuva ou cada leitura; coleta + geração do arquivo)
     format.ts               formatação pt-BR (mm, datas no fuso, idade, uptime, atualidade)
     geo.ts                  distância haversine e estações mais próximas
   hooks/                    use-auth (AuthProvider: me/login/logout/401 → /entrar), use-fetch, use-zod-search,
@@ -169,7 +169,8 @@ O front (`lib/period.ts → buildSeriesTable`):
 - sem `sendIntervalS` (estação que nunca reportou `conf`) → cobertura `null` e o badge mostra "cobertura —" com explicação.
 - **área pública**: a API não expõe o intervalo de envio, então a cobertura não é estimável: totais, gráfico,
   tabela e calendário **mostram o campo de cobertura** com "—" (e o aviso explicando), como no logado; a exportação
-  pública fica sem colunas de cobertura (`situacao` só `COM_DADOS|SEM_DADOS`). A regra "sem dado ≠ chuva zero" continua valendo.
+  pública tem as mesmas colunas, com `leituras_esperadas`/`cobertura_pct` vazias e `situacao` `COBERTURA_DESCONHECIDA`
+  nos buckets com dado. A regra "sem dado ≠ chuva zero" continua valendo.
 Totais do overview (hoje/24 h/7/30 dias; o painel do produtor mostra só hoje/7/30, em destaque, com o badge de
 cobertura no lugar do aviso "acumulado parcial"): cobertura estimada por `useTotalsCoverage` com uma série
 HOUR (24 h) e uma DAY (30 dias). Faixas do badge: ≥95% boa, ≥70% parcial, abaixo disso baixa.
@@ -192,25 +193,32 @@ e mostra a legenda compartilhada (`components/station/rain-legend.tsx`, também 
 `last24hMm` + `lastReadingAt` (`mm24h`); logado usa o `overview` — o painel do ADMIN busca um `/overview` por estação
 (6 em paralelo) até a API trazer a chuva recente na listagem.
 
-## Exportação CSV / XLSX (feature nova)
+## Exportação CSV / XLSX
 
 Onde: aba **Exportar** do detalhe da estação (logado e público) e página **/exportar** (várias
 estações; link "Exportar" na lista de estações). Formulário `components/station/export-form.tsx`
-(RHF + Zod, validação de período por conjunto/granularidade). Geração em `lib/export.ts`:
+(RHF + Zod): estações, período, "Agrupar por" e formato, para todos os perfis. Padrão: **agregados de chuva**
+(série HOUR/DAY/WEEK/MONTH). O switch **"Exportar cada leitura"** desabilita o "Agrupar por" e exporta um registro por
+pacote (`/readings`); na área pública ele aparece desabilitado com explicação (a API pública não expõe leituras).
+Status do dispositivo não é exportado. Geração em `lib/export.ts`:
 
-- **Conjuntos**: série agregada (HOUR/DAY/WEEK/MONTH, com leituras recebidas/esperadas, cobertura e
-  situação `COMPLETO|PARCIAL|SEM_DADOS|COBERTURA_DESCONHECIDA`), leituras brutas (com
-  `pacotes_perdidos_antes` calculado pelas lacunas de `seq`) e status (bateria, RSSI, uptime).
-  A área pública só exporta a série agregada (endpoints `/api/public`), sem leituras esperadas/cobertura.
-- **Coleta**: período fatiado pelos limites da API (93 dias para readings/status e HOUR; 1100 para DAY);
-  readings/status paginam com `size=100` e 4 requisições em paralelo, com barra de progresso e
-  cancelamento (`AbortController`). Teto de 200 mil linhas por estação (`MAX_RAW_ROWS`); limites de
-  período no form: 366 dias para leituras/status e série horária.
-- **CSV**: tabela única com coluna `estacao`, UTF-8 com BOM; dialeto pt-BR (`;` e vírgula decimal) ou
-  internacional (`,` e ponto). Datas em hora local do fuso, `yyyy-MM-dd HH:mm:ss`.
-- **XLSX**: uma aba por estação (cabeçalho congelado, autofiltro, datas e números tipados) + aba
-  **Sobre** (gerado em, conjunto, granularidade, período, fuso, estações e aviso sobre lacunas).
-- Nome do arquivo: `pluviffar-<estacao|N-estacoes>-<conjunto>-<AAAAMMDD>-<AAAAMMDD>.<ext>`.
+- **Colunas** com nomes técnicos em pt-BR (`snake_case`, sem acento — quem exporta vai analisar em pandas/R/planilha):
+  `estacao`, `inicio`, `chuva_mm`, `leituras_recebidas`, `leituras_esperadas`, `cobertura_pct`, `situacao`
+  (`COMPLETO|PARCIAL|SEM_DADOS|COBERTURA_DESCONHECIDA`). Mesmas colunas e valores em toda origem: na área pública
+  (sem intervalo de envio) esperadas/cobertura ficam vazias e `situacao` é `SEM_DADOS|COBERTURA_DESCONHECIDA`. Bucket sem leitura → chuva vazia, nunca 0. Datas na hora local do fuso (horário de Brasília).
+- **Leituras** (`raw`): `estacao`, `medido_em`, `recebido_em` (com segundos), `basculadas`, `chuva_mm`, `seq`,
+  `pacotes_perdidos_antes` (lacunas de `seq`; reinício não conta). Ordenadas e sem duplicatas.
+- **Sem limites no front** (período, linhas ou nº de estações): o período é fatiado pelos limites da API por requisição
+  (`MAX_DAYS`: 93 dias para HOUR e leituras, 1100 DAY, 3660 WEEK, 10980 MONTH) com cortes em início de bucket
+  (`chunkRangeByBucket`), com barra de progresso e cancelamento (`AbortController`). Leituras paginam com `size=100`,
+  4 requisições em paralelo — períodos longos demoram (ver "Falta na API").
+- **CSV**: sempre no padrão pt-BR (`;`, vírgula decimal, datas `dd/mm/aaaa [HH:mm[:ss]]` no fuso), tabela única, UTF-8 com BOM
+  (Blob montado linha a linha).
+- **XLSX**: uma aba por estação (cabeçalho congelado, autofiltro, datas e números tipados; acima de 1.048.575 linhas
+  continua em `Nome (2)`, `Nome (3)`…) + aba
+  **Sobre** (gerado em, dados/agrupamento, período, fuso, estações, aviso sobre lacunas e dicionário de colunas —
+  `Column.description`).
+- Nome do arquivo: `pluviffar-<estacao|N-estacoes>-<chuva-horaria|chuva-diaria|chuva-semanal|chuva-mensal|leituras>-<AAAAMMDD>-<AAAAMMDD>.<ext>`.
 
 ## Painel (`/painel`)
 
@@ -255,9 +263,11 @@ TODOs para o backend (o front já tem pontos de encaixe ou paliativos marcados):
       intervalo de envio → a área pública não consegue mostrar cobertura (exibe "cobertura —").
       `last24hMm` deveria vir acompanhado de `last24hCoveragePct` (hoje "0 mm" e "sem dados" se confundem
       quando há leitura antiga; o front usa `lastReadingAt` para mostrar "Sem dados").
-- [ ] **Exportação no servidor**: `GET /api/stations/{id}/export?dataset=series|readings|status&format=csv|xlsx&from&to&bucket`
-      (streaming) e `GET /api/public/stations/{id}/export` (só série). Alternativa mínima: aumentar o `size`
-      máximo de `/readings` e `/status` (100 → 5000). Com leitura por minuto, 93 dias = ~1340 requisições.
+- [ ] **Exportação no servidor**: `GET /api/stations/{id}/export?dataset=series|readings&format=csv|xlsx&from&to&bucket`
+      (streaming) e `GET /api/public/stations/{id}/export`. Alternativa mínima: aumentar o `size` máximo de `/readings`
+      (100 → 5000) — com leitura por minuto, 93 dias = ~1340 requisições.
+- [ ] **Leituras na área pública** (`GET /api/public/stations/{id}/readings`, se a política de dados permitir): hoje o
+      switch "Exportar cada leitura" fica desabilitado no detalhe público.
 - [ ] **Última leitura/status na listagem de estações** (`lastReadingAt`, `lastStatusAt`, `batteryPct`,
       `last24hMm`) para mostrar atualidade na lista e no painel sem N chamadas a `/overview`.
 - [ ] **Resumo da rede para o painel** (`GET /api/dashboard`): totais, estações sem comunicação há 24 h,

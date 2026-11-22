@@ -161,7 +161,7 @@ export function StationTabs({
           <CardHeader>
             <CardTitle>Exportar dados desta estação</CardTitle>
             <CardDescription>
-              Série agregada, leituras brutas ou status, em CSV ou Excel. Para várias estações de uma vez, use{" "}
+              Chuva acumulada por hora, dia, semana ou mês, em Excel ou CSV. Para várias estações de uma vez, use{" "}
               <Link to="/exportar" className="underline underline-offset-4">
                 Exportar dados
               </Link>

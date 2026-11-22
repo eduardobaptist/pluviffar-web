@@ -23,41 +23,24 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { FormField } from "@/components/form/form-field"
 import { FormRootError } from "@/components/form/form-root-error"
 import type { Bucket } from "@/lib/api/types"
-import { DATASET_LABEL, runExport, type ExportDataset, type ExportStation, type Progress as P } from "@/lib/export"
-import { BUCKET_LABEL, calendarDays, dayRange, MAX_DAYS } from "@/lib/period"
+import { runExport, type ExportStation, type Progress as P } from "@/lib/export"
+import { BUCKET_LABEL, dayRange } from "@/lib/period"
 import { DateRangePicker } from "./date-range-picker"
-
-const LIMIT_DAYS: Record<ExportDataset, number> = { series: 0, readings: 366, status: 366 }
-const SERIES_LIMIT: Record<Bucket, number> = { HOUR: 366, DAY: MAX_DAYS.DAY * 3, WEEK: MAX_DAYS.WEEK, MONTH: MAX_DAYS.MONTH }
 
 const schema = z
   .object({
-    stationIds: z.array(z.string()).min(1, "Selecione ao menos uma estação.").max(20, "Exporte no máximo 20 estações por vez."),
-    dataset: z.enum(["series", "readings", "status"]),
+    stationIds: z.array(z.string()).min(1, "Selecione ao menos uma estação."),
+    raw: z.boolean(),
     bucket: z.enum(["HOUR", "DAY", "WEEK", "MONTH"]),
     range: z.object({ from: z.date().optional(), to: z.date().optional() }),
     format: z.enum(["csv", "xlsx"]),
-    dialect: z.enum(["br", "intl"]),
   })
   .superRefine((v, ctx) => {
-    if (!v.range.from) {
-      ctx.addIssue({ code: "custom", path: ["range"], message: "Escolha o período." })
-      return
-    }
-    const days = calendarDays(v.range.from, v.range.to ?? v.range.from)
-    const max = v.dataset === "series" ? SERIES_LIMIT[v.bucket] : LIMIT_DAYS[v.dataset]
-    if (days > max)
-      ctx.addIssue({
-        code: "custom",
-        path: ["range"],
-        message:
-          v.dataset === "series"
-            ? `Com agrupamento por ${BUCKET_LABEL[v.bucket].toLowerCase()}, o período máximo é de ${max} dias.`
-            : `Para ${DATASET_LABEL[v.dataset].toLowerCase()}, o período máximo é de ${max} dias.`,
-      })
+    if (!v.range.from) ctx.addIssue({ code: "custom", path: ["range"], message: "Escolha o período." })
   })
 
 type Values = z.infer<typeof schema>
@@ -68,8 +51,10 @@ const FORMATS = [
 ] as const
 
 /**
- * Exportação de dados das estações (CSV/XLSX). Formulário em página/aba — nunca em dialog.
- * `publicMode`: só série agregada pelos endpoints públicos.
+ * Exportação de chuva das estações (CSV/XLSX): agregados por hora/dia/semana/mês ou, com o switch
+ * "Exportar cada leitura", um registro por pacote (desabilita o "Agrupar por").
+ * Formulário em página/aba — nunca em dialog.
+ * `publicMode`: endpoints públicos, sem colunas de cobertura; leituras indisponíveis (a API pública não as expõe).
  */
 export function ExportForm({
   stations,
@@ -89,14 +74,13 @@ export function ExportForm({
     resolver: zodResolver(schema),
     defaultValues: {
       stationIds: defaultStationIds ?? (stations.length === 1 ? [stations[0]!.id] : []),
-      dataset: "series",
+      raw: false,
       bucket: "DAY",
       range: { from: subDays(new Date(), 29), to: new Date() },
       format: "xlsx",
-      dialect: "br",
     },
   })
-  const [dataset, fmt] = useWatch({ control: form.control, name: ["dataset", "format"] })
+  const raw = useWatch({ control: form.control, name: "raw" })
 
   async function onSubmit(v: Values) {
     const selected = stations.filter((s) => v.stationIds.includes(s.id))
@@ -107,11 +91,10 @@ export function ExportForm({
       const { rows } = await runExport(
         {
           stations: selected,
-          dataset: v.dataset,
           bucket: v.bucket,
+          raw: v.raw && !publicMode,
           range: dayRange(v.range.from!, v.range.to ?? v.range.from!),
           format: v.format,
-          dialect: v.dialect,
           publicMode,
         },
         ctrl.signal,
@@ -141,7 +124,11 @@ export function ExportForm({
                 <FieldLegend variant="label">Estações</FieldLegend>
                 <FieldDescription>
                   {field.value.length} de {stations.length} selecionada(s).{" "}
-                  <button type="button" className="underline underline-offset-4" onClick={() => field.onChange(field.value.length ? [] : stations.slice(0, 20).map((s) => s.id))}>
+                  <button
+                    type="button"
+                    className="underline underline-offset-4"
+                    onClick={() => field.onChange(field.value.length ? [] : stations.map((s) => s.id))}
+                  >
                     {field.value.length ? "Limpar" : "Selecionar todas"}
                   </button>
                 </FieldDescription>
@@ -168,42 +155,18 @@ export function ExportForm({
           />
         )}
 
-        {!publicMode && (
-          <Controller
-            control={form.control}
-            name="dataset"
-            render={({ field }) => (
-              <FieldSet>
-                <FieldLegend variant="label">Dados</FieldLegend>
-                <RadioGroup value={field.value} onValueChange={field.onChange} className="grid gap-3 sm:grid-cols-3">
-                  {(Object.keys(DATASET_LABEL) as ExportDataset[]).map((d) => (
-                    <FieldLabel key={d} htmlFor={`exp-ds-${d}`}>
-                      <Field orientation="horizontal">
-                        <FieldContent>
-                          <FieldTitle>{DATASET_LABEL[d]}</FieldTitle>
-                          <FieldDescription>
-                            {d === "series" ? "Chuva por hora, dia, semana ou mês." : d === "readings" ? "Cada leitura recebida da estação." : "Bateria, sinal e tempo ligado."}
-                          </FieldDescription>
-                        </FieldContent>
-                        <RadioGroupItem value={d} id={`exp-ds-${d}`} />
-                      </Field>
-                    </FieldLabel>
-                  ))}
-                </RadioGroup>
-              </FieldSet>
-            )}
-          />
-        )}
-
         <div className="grid gap-6 sm:grid-cols-2">
           <FormField control={form.control} name="range" label="Período">
-            {({ value, onChange, id, "aria-invalid": invalid }) => <DateRangePicker id={id} value={value} onChange={onChange} invalid={invalid} className="w-full" />}
+            {({ value, onChange, id, "aria-invalid": invalid }) => (
+              <DateRangePicker id={id} value={value} onChange={onChange} invalid={invalid} className="w-full" />
+            )}
           </FormField>
-          {dataset === "series" && (
-            <FormField control={form.control} name="bucket" label="Agrupar por">
-              {({ value, onChange, id, "aria-invalid": invalid }) => (
-                <Select value={value} onValueChange={onChange}>
-                  <SelectTrigger id={id} aria-invalid={invalid} className="w-full">
+          <FormField control={form.control} name="bucket" label="Agrupar por">
+            {({ value, onChange, id, "aria-invalid": invalid }) => (
+              // "Exportar cada leitura" é o contraponto do agrupamento: ligado, desabilita o select.
+              <div className="flex items-center gap-4">
+                <Select value={value} onValueChange={onChange} disabled={raw}>
+                  <SelectTrigger id={id} aria-invalid={invalid} className="min-w-0 flex-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -214,9 +177,20 @@ export function ExportForm({
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-            </FormField>
-          )}
+                <Field orientation="horizontal" className="w-auto shrink-0" data-disabled={publicMode || undefined}>
+                  <Switch
+                    id="exp-raw"
+                    checked={raw && !publicMode}
+                    onCheckedChange={(c) => form.setValue("raw", c, { shouldValidate: true })}
+                    disabled={publicMode}
+                  />
+                  <FieldLabel htmlFor="exp-raw" className="font-normal whitespace-nowrap">
+                    Exportar cada leitura
+                  </FieldLabel>
+                </Field>
+              </div>
+            )}
+          </FormField>
         </div>
 
         <Controller
@@ -242,27 +216,6 @@ export function ExportForm({
             </FieldSet>
           )}
         />
-
-        {fmt === "csv" && (
-          <FormField control={form.control} name="dialect" label="Padrão do CSV">
-            {({ value, onChange, id }) => (
-              <RadioGroup id={id} value={value} onValueChange={onChange} className="flex flex-wrap gap-6">
-                <Field orientation="horizontal" className="w-auto">
-                  <RadioGroupItem value="br" id="dialect-br" />
-                  <FieldLabel htmlFor="dialect-br" className="font-normal">
-                    Excel pt-BR (separador “;”, decimal “,”)
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal" className="w-auto">
-                  <RadioGroupItem value="intl" id="dialect-intl" />
-                  <FieldLabel htmlFor="dialect-intl" className="font-normal">
-                    Internacional (separador “,”, decimal “.”)
-                  </FieldLabel>
-                </Field>
-              </RadioGroup>
-            )}
-          </FormField>
-        )}
       </FieldGroup>
 
       <FormRootError errors={form.formState.errors} />

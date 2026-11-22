@@ -172,6 +172,26 @@ export function buildSeriesTable(series: PrecipitationSeries, sendIntervalS?: nu
   }
 }
 
+/**
+ * Como `chunkRange`, mas cada corte cai num início de bucket (no fuso), para nenhum bucket
+ * ficar dividido entre duas requisições (importante em WEEK/MONTH).
+ */
+export function chunkRangeByBucket(r: DateRange, bucket: Bucket, maxDays: number, tz = DEFAULT_TIMEZONE): DateRange[] {
+  const out: DateRange[] = []
+  let cur = r.from.getTime()
+  const end = r.to.getTime()
+  while (cur < end) {
+    let cut = Math.min(cur + maxDays * 86_400_000, end)
+    if (cut < end) {
+      const aligned = align(new Date(cut), bucket, tz).getTime()
+      if (aligned > cur) cut = aligned
+    }
+    out.push({ from: new Date(cur), to: new Date(cut) })
+    cur = cut
+  }
+  return out
+}
+
 /** Divide [from, to) em janelas de no máximo `maxDays` dias. */
 export function chunkRange(r: DateRange, maxDays: number): DateRange[] {
   const out: DateRange[] = []
