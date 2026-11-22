@@ -17,18 +17,10 @@ import { fmt24h, mm24h } from "@/lib/format"
 /** Âncora da seção "Como funciona" (link "Sobre" do cabeçalho e `/sobre` apontam para cá). */
 const HOW_IT_WORKS_ID = "como-funciona"
 
-/** Palavra em destaque no título: marca-texto em faixa baixa (tokens, legível nos dois temas). */
-function Highlight({ children, tone }: { children: React.ReactNode; tone: "field" | "home" }) {
+/** Frase em destaque no título: gradiente campo → chuva (verde do primário ao azul da série), legível nos dois temas. */
+function Accent({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={
-        tone === "field"
-          ? "box-decoration-clone bg-linear-to-t from-rain-2 from-40% to-transparent to-40% -mx-0.5 px-1"
-          : "box-decoration-clone bg-linear-to-t from-chart-2/35 from-40% to-transparent to-40% -mx-0.5 px-1"
-      }
-    >
-      {children}
-    </span>
+    <span className="bg-linear-to-r from-primary to-chart-2 box-decoration-clone bg-clip-text pb-1 text-transparent dark:from-success">{children}</span>
   )
 }
 
@@ -45,7 +37,7 @@ const STEPS = [
   },
   {
     icon: Smartphone,
-    title: "Você vê em qualquer dispositivo",
+    title: "Você vê de qualquer dispositivo",
     text: "Totais de hoje, 7 e 30 dias, gráfico, calendário de chuva e exportação para planilha. O produtor acompanha as suas estações; as públicas ficam abertas para todos aqui no site.",
   },
 ] as const
@@ -150,24 +142,31 @@ export function HomePage() {
 
   return (
     <>
-      <section className="overflow-hidden border-b bg-muted/40">
+      <section className="relative isolate overflow-hidden border-b bg-muted/40">
+        {/* grade sutil com fade radial + brilho atrás do carrossel */}
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-size-[2.5rem_2.5rem] opacity-60 mask-[radial-gradient(ellipse_70%_60%_at_30%_0%,black,transparent)]"
+        />
+        <div aria-hidden className="absolute top-1/4 right-[-10%] -z-10 size-[32rem] rounded-full bg-chart-2/10 blur-3xl md:right-0" />
+        <div aria-hidden className="absolute -top-24 right-1/3 -z-10 size-[24rem] rounded-full bg-primary/10 blur-3xl dark:bg-success/10" />
+
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 md:grid-cols-[1fr_1.05fr] md:gap-12 md:px-8 md:py-16 lg:py-20">
-          <div className="flex flex-col gap-5">
-            <p className="text-sm font-medium text-muted-foreground">Instituto Federal Farroupilha</p>
-            <h1 className="text-4xl leading-[1.15] font-bold tracking-[-0.02em] sm:text-5xl md:text-[2.75rem] lg:text-5xl">
-              Chuva medida no <Highlight tone="field">campo</Highlight>,<br className="hidden lg:block" /> sem sair de <Highlight tone="home">casa</Highlight>.
+          <div className="flex flex-col gap-6">
+            <h1 className="text-4xl leading-[1.08] font-bold tracking-[-0.035em] text-balance sm:text-5xl md:text-[2.75rem] lg:text-[3.5rem]">
+              Chuva medida no campo,<br /> <Accent>sem sair de casa.</Accent>
             </h1>
             <p className="max-w-lg text-lg text-pretty text-muted-foreground">
               Veja <strong className="font-semibold text-foreground">quanto choveu</strong> nas estações da rede perto de você, medido por pluviômetros
               automáticos e atualizado a cada leitura.
             </p>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
               <Button asChild size="lg">
                 <Link to="/mapa">
                   Abrir o mapa <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="ghost">
                 <Link to={{ hash: HOW_IT_WORKS_ID }}>Como funciona</Link>
               </Button>
             </div>

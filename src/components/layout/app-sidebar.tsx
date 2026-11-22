@@ -23,8 +23,8 @@ import { Logo } from "./logo"
 
 const MAIN = [
   { to: "/painel", label: "Painel", icon: LayoutDashboard, exact: true },
-  { to: "/minhas-estacoes", label: "Estações", icon: CloudRain },
   { to: "/gateways", label: "Gateways", icon: Router },
+  { to: "/minhas-estacoes", label: "Estações", icon: CloudRain },
   { to: "/exportar", label: "Exportar dados", icon: Download },
 ] as const
 
