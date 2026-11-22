@@ -1,21 +1,12 @@
 import { useState } from "react"
 import { fmtMm, fmtPct } from "@/lib/format"
 import { bucketLabel, type SeriesRow } from "@/lib/period"
-import { groupDaysByMonth, rainLegend, rainLevel, type MonthTotal, type RainLevel } from "@/lib/rain-calendar"
+import { groupDaysByMonth, rainLevel, RAIN_LEVEL_CLASS, RAIN_NO_DATA_CLASS, type MonthTotal } from "@/lib/rain-calendar"
+import { RainLegend } from "./rain-legend"
 import { cn } from "@/lib/utils"
 
-// Classes estáticas (o Tailwind precisa enxergar os nomes completos).
-const LEVEL_CLASS: Record<RainLevel, string> = {
-  0: "border border-border bg-card text-foreground",
-  1: "bg-rain-1 text-rain-1-foreground",
-  2: "bg-rain-2 text-rain-2-foreground",
-  3: "bg-rain-3 text-rain-3-foreground",
-  4: "bg-rain-4 text-rain-4-foreground",
-  5: "bg-rain-5 text-rain-5-foreground",
-  6: "bg-rain-6 text-rain-6-foreground",
-}
-const NO_DATA_CLASS =
-  "border border-dashed border-muted-foreground/40 text-muted-foreground bg-[repeating-linear-gradient(135deg,var(--muted)_0_3px,transparent_3px_6px)]"
+const LEVEL_CLASS = RAIN_LEVEL_CLASS
+const NO_DATA_CLASS = RAIN_NO_DATA_CLASS
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"]
 
@@ -128,28 +119,10 @@ function Total({ total }: { total: MonthTotal }) {
   )
 }
 
-function Swatch({ className }: { className: string }) {
-  return <span aria-hidden className={cn("inline-block size-3.5 shrink-0 rounded-sm", className)} />
-}
-
 function Legend({ hasCoverage }: { hasCoverage: boolean }) {
   return (
     <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="font-medium text-foreground">Chuva no dia (mm)</span>
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          {rainLegend().map((l) => (
-            <span key={l.level} className="flex items-center gap-1 tabular-nums">
-              <Swatch className={LEVEL_CLASS[l.level]} />
-              {l.label}
-            </span>
-          ))}
-          <span className="flex items-center gap-1">
-            <Swatch className={NO_DATA_CLASS} />
-            Sem dados
-          </span>
-        </span>
-      </div>
+      <RainLegend title="Chuva no dia (mm)" />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {hasCoverage && (
           <>

@@ -63,7 +63,7 @@ export interface Progress {
 
 // ------------------------------------------------------------------ coleta
 
-async function pool<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+export async function pool<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
   const out: T[] = new Array(tasks.length)
   let i = 0
   const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {

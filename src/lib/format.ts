@@ -70,5 +70,10 @@ export function hasDataWithin(iso: string | null | undefined, hours: number): bo
 
 /** Chuva de 24 h da área pública: "Sem dados" se não houve leitura nas últimas 24 h. */
 export function fmt24h(mm: number, lastReadingAt: string | null | undefined): string {
-  return hasDataWithin(lastReadingAt, 24) ? fmtMm(mm) : "Sem dados"
+  return fmtMm(mm24h(mm, lastReadingAt))
+}
+
+/** Chuva de 24 h como número: `null` (sem dados) se não houve leitura nas últimas 24 h — nunca 0. */
+export function mm24h(mm: number, lastReadingAt: string | null | undefined): number | null {
+  return hasDataWithin(lastReadingAt, 24) ? mm : null
 }

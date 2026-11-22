@@ -9,14 +9,14 @@ import { QueryError } from "@/components/common/query-error"
 import { StationMap, type MapPoint } from "@/components/station/station-map"
 import { useFetch } from "@/hooks/use-fetch"
 import { publicApi } from "@/lib/api/endpoints"
-import { fmt24h, fmtRelative } from "@/lib/format"
+import { fmt24h, fmtRelative, mm24h } from "@/lib/format"
 
 export function MapPage() {
   const q = useFetch(() => publicApi.list(), [], { intervalMs: 5 * 60_000 })
   const [term, setTerm] = useState("")
   const filtered = useMemo(() => (q.data ?? []).filter((s) => s.name.toLowerCase().includes(term.toLowerCase())), [q.data, term])
   const points = useMemo<MapPoint[]>(
-    () => filtered.map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public" })),
+    () => filtered.map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public", mm: mm24h(s.last24hMm, s.lastReadingAt) })),
     [filtered],
   )
   if (q.error) return <div className="p-4"><QueryError error={q.error} onRetry={q.reload} /></div>

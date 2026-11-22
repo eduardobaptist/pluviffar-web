@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusDot } from "@/components/common/status-badges"
 import type { Station, StationOverview } from "@/lib/api/types"
-import { fmtDateTime, fmtNumber, fmtRelative, freshness } from "@/lib/format"
+import { fmtDateTime, fmtNumber, fmtRelative, freshness, mm24h } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { DeviceSummary } from "./device-summary"
 import { ExportForm } from "./export-form"
@@ -71,10 +71,12 @@ function RainTab({ station, overview }: { station: Station; overview: StationOve
   )
 }
 
-function ConfigTab({ station: s }: { station: Station }) {
+function ConfigTab({ station: s, overview }: { station: Station; overview: StationOverview | undefined }) {
+  // Sem overview ainda → ponto neutro; depois, a cor da chuva de 24 h (null = sem dados).
+  const mm = overview ? mm24h(overview.precipitation.last24hMm, overview.lastReading?.measuredAt) : undefined
   const points = useMemo(
-    () => (s.latitude != null && s.longitude != null ? [{ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude }] : []),
-    [s.id, s.name, s.latitude, s.longitude],
+    () => (s.latitude != null && s.longitude != null ? [{ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, mm }] : []),
+    [s.id, s.name, s.latitude, s.longitude, mm],
   )
   return (
     <div className="flex flex-col gap-6">
@@ -152,7 +154,7 @@ export function StationTabs({
         <StatusTable stationId={station.id} />
       </TabsContent>
       <TabsContent value="configuracao" className="pt-2">
-        <ConfigTab station={station} />
+        <ConfigTab station={station} overview={overview} />
       </TabsContent>
       <TabsContent value="exportar" className="pt-2">
         <Card>

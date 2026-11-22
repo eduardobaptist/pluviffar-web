@@ -186,6 +186,12 @@ RAIN_THRESHOLDS`, limites **fixos** em mm para a mesma cor valer entre estaçõe
 < 95% / < 70%. Totais do mês somam só o medido (`null` se nada) e levam `*` quando parciais. Detalhe do dia numa
 barra fixa (`sticky top-14`) por hover/foco/toque.
 
+**Mapas** (`StationMap`, todos os lugares): o ponto é colorido pela chuva das **últimas 24 h** com a mesma escala
+(`MapPoint.mm`; `null` = "Sem dados" hachurado, nunca 0 mm; `undefined` = ponto verde neutro, ex.: prévia do cadastro)
+e mostra a legenda compartilhada (`components/station/rain-legend.tsx`, também usada no calendário). Área pública usa
+`last24hMm` + `lastReadingAt` (`mm24h`); logado usa o `overview` — o painel do ADMIN busca um `/overview` por estação
+(6 em paralelo) até a API trazer a chuva recente na listagem.
+
 ## Exportação CSV / XLSX (feature nova)
 
 Onde: aba **Exportar** do detalhe da estação (logado e público) e página **/exportar** (várias

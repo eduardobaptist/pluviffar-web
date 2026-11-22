@@ -10,6 +10,8 @@ import { StationMap, type MapPoint } from "@/components/station/station-map"
 import { stationsApi, usersApi } from "@/lib/api/endpoints"
 import { useMe } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
+import { pool } from "@/lib/export"
+import { fmtMm, mm24h } from "@/lib/format"
 
 function Kpi({ icon: Icon, label, value, to }: { icon: LucideIcon; label: string; value: number | undefined; to: string }) {
   return (
@@ -44,19 +46,44 @@ export function AdminDashboard() {
   const users = useFetch(() => usersApi.list({ size: 1 }), [])
 
   const list = stations.data
+  // A listagem não traz a chuva recente (ver "Falta na API"): um /overview por estação com coordenadas, 6 por vez.
+  const located = useMemo(() => (list ?? []).filter((s) => s.latitude != null && s.longitude != null), [list])
+  const rain = useFetch(
+    located.length
+      ? async (signal) => {
+          const entries = await pool(
+            located.map((s) => async () => {
+              try {
+                const o = await stationsApi.overview(s.id, undefined, signal)
+                return [s.id, mm24h(o.precipitation.last24hMm, o.lastReading?.measuredAt)] as const
+              } catch (e) {
+                if (signal.aborted) throw e
+                return [s.id, undefined] as const // falhou: ponto neutro, nunca "0 mm"
+              }
+            }),
+            6,
+          )
+          return new Map<string, number | null | undefined>(entries)
+        }
+      : null,
+    [located],
+  )
+  const rainById = rain.data
   const points = useMemo<MapPoint[]>(
     () =>
-      (list ?? [])
-        .filter((s) => s.latitude != null && s.longitude != null)
-        .map((s) => ({
+      located.map((s) => {
+        const mm = rainById?.get(s.id)
+        return {
           id: s.id,
           name: s.name,
           lat: s.latitude!,
           lng: s.longitude!,
-          info: [s.owner.name, `Gateway: ${s.gateway.name}`, s.isPublic ? "Pública" : "Privada"],
+          info: [...(rainById ? [`24 h: ${fmtMm(mm)}`] : []), s.owner.name, `Gateway: ${s.gateway.name}`, s.isPublic ? "Pública" : "Privada"],
           href: "private",
-        })),
-    [list],
+          mm,
+        }
+      }),
+    [located, rainById],
   )
 
   return (
@@ -76,7 +103,7 @@ export function AdminDashboard() {
             </CardTitle>
             <CardDescription>
               {list
-                ? `${points.length} de ${list.length} estações com coordenadas cadastradas. Clique num ponto para ver detalhes.`
+                ? `${points.length} de ${list.length} estações com coordenadas cadastradas${rain.loading ? " · carregando chuva das últimas 24 h…" : ""}. Clique num ponto para ver detalhes.`
                 : "Carregando estações…"}
             </CardDescription>
           </CardHeader>

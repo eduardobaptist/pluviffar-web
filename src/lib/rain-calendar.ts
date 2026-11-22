@@ -20,6 +20,20 @@ export function rainLevel(mm: number | null): RainLevel | null {
   return (i === -1 ? 6 : i + 1) as RainLevel
 }
 
+/** Classes Tailwind por faixa (calendário, legenda). */
+// Classes estáticas: o Tailwind precisa enxergar os nomes completos.
+export const RAIN_LEVEL_CLASS: Record<RainLevel, string> = {
+  0: "border border-border bg-card text-foreground",
+  1: "bg-rain-1 text-rain-1-foreground",
+  2: "bg-rain-2 text-rain-2-foreground",
+  3: "bg-rain-3 text-rain-3-foreground",
+  4: "bg-rain-4 text-rain-4-foreground",
+  5: "bg-rain-5 text-rain-5-foreground",
+  6: "bg-rain-6 text-rain-6-foreground",
+}
+export const RAIN_NO_DATA_CLASS =
+  "border border-dashed border-muted-foreground/40 text-muted-foreground bg-[repeating-linear-gradient(135deg,var(--muted)_0_3px,transparent_3px_6px)]"
+
 const legendNf = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 
 /** Rótulos da legenda (faixas em mm). */

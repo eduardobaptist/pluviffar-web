@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFetch } from "@/hooks/use-fetch"
 import { useGeolocation } from "@/hooks/use-geolocation"
 import { publicApi } from "@/lib/api/endpoints"
-import { fmt24h } from "@/lib/format"
+import { fmt24h, mm24h } from "@/lib/format"
 
 /** Âncora da seção "Como funciona" (link "Sobre" do cabeçalho e `/sobre` apontam para cá). */
 const HOW_IT_WORKS_ID = "como-funciona"
@@ -40,12 +40,12 @@ const STEPS = [
   },
   {
     icon: Radio,
-    title: "A medição viaja até o servidor",
-    text: "O pluviômetro envia as leituras por rádio (ESP-NOW) para um gateway na sede da propriedade, que repassa tudo pela internet (Wi-Fi/MQTT) ao servidor do PluvIFFar.",
+    title: "A medição viaja até o Pluviffar",
+    text: "O pluviômetro envia as leituras por rádio (ESP-NOW) para um gateway na sede da propriedade, que repassa tudo pela internet ao servidor do PluvIFFar.",
   },
   {
     icon: Smartphone,
-    title: "Você vê no celular",
+    title: "Você vê em qualquer dispositivo",
     text: "Totais de hoje, 7 e 30 dias, gráfico, calendário de chuva e exportação para planilha. O produtor acompanha as suas estações; as públicas ficam abertas para todos aqui no site.",
   },
 ] as const
@@ -144,7 +144,7 @@ export function HomePage() {
   const geo = useGeolocation()
   useScrollToHash()
   const points = useMemo<MapPoint[]>(
-    () => (q.data ?? []).map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public" })),
+    () => (q.data ?? []).map((s) => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, info: [`24 h: ${fmt24h(s.last24hMm, s.lastReadingAt)}`], href: "public", mm: mm24h(s.last24hMm, s.lastReadingAt) })),
     [q.data],
   )
 

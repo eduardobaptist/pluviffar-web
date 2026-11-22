@@ -19,7 +19,7 @@ import { useFetch } from "@/hooks/use-fetch"
 import { useZodSearch } from "@/hooks/use-zod-search"
 import { publicApi } from "@/lib/api/endpoints"
 import type { PublicStationDetail } from "@/lib/api/types"
-import { fmtRelative } from "@/lib/format"
+import { fmtRelative, mm24h } from "@/lib/format"
 
 const TABS = ["chuva", "localizacao", "exportar"] as const
 type Tab = (typeof TABS)[number]
@@ -27,7 +27,8 @@ const searchSchema = z.object({ tab: z.enum(TABS).catch("chuva").default("chuva"
 
 /** Abas da estação pública — mesmo padrão do `StationTabs` (logado), só com o que a área pública expõe. */
 function PublicStationTabs({ station: s, tab, onTabChange }: { station: PublicStationDetail; tab: Tab; onTabChange: (t: Tab) => void }) {
-  const points = useMemo(() => [{ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude }], [s.id, s.name, s.latitude, s.longitude])
+  const mm = mm24h(s.precipitation.last24hMm, s.lastReadingAt)
+  const points = useMemo(() => [{ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, mm }], [s.id, s.name, s.latitude, s.longitude, mm])
   return (
     <Tabs value={tab} onValueChange={(t) => onTabChange(t as Tab)}>
       <TabsList className="flex-wrap">
