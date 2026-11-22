@@ -165,6 +165,21 @@ export function StationCarousel({ stations, geo, onRetry, className }: { station
       api.off("select", onSelect).off("reInit", onSelect)
     }
   }, [api])
+  // Ao voltar para a janela (Alt+Tab) ou aba, reposiciona no slide atual: o navegador congela o
+  // requestAnimationFrame com a janela coberta, e uma transição interrompida no meio pode deixar os slides
+  // do loop fora da área visível (cards "invisíveis").
+  useEffect(() => {
+    if (!api) return
+    const realign = () => {
+      if (!document.hidden) api.reInit()
+    }
+    document.addEventListener("visibilitychange", realign)
+    window.addEventListener("focus", realign)
+    return () => {
+      document.removeEventListener("visibilitychange", realign)
+      window.removeEventListener("focus", realign)
+    }
+  }, [api])
   // Ao trocar a ordem (localização obtida), volta para a primeira.
   useEffect(() => {
     api?.scrollTo(0, true)
