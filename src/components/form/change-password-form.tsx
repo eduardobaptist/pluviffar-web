@@ -14,7 +14,16 @@ import { FormRootError } from "./form-root-error"
 
 type Values = z.infer<typeof changePasswordSchema>
 
-export function ChangePasswordForm({ onDone, submitLabel = "Alterar senha" }: { onDone: () => void | Promise<void>; submitLabel?: string }) {
+export function ChangePasswordForm({
+  onDone,
+  submitLabel = "Alterar senha",
+  fullWidth = false,
+}: {
+  onDone: () => void | Promise<void>
+  submitLabel?: string
+  /** Botão na largura toda (telas de autenticação, como o login). */
+  fullWidth?: boolean
+}) {
   const form = useForm<Values>({ resolver: zodResolver(changePasswordSchema), defaultValues: { currentPassword: "", newPassword: "", confirm: "" } })
   async function onSubmit(v: Values) {
     try {
@@ -41,7 +50,7 @@ export function ChangePasswordForm({ onDone, submitLabel = "Alterar senha" }: { 
           {(f) => <Input {...f} type="password" autoComplete="new-password" />}
         </FormField>
         <FormRootError errors={form.formState.errors} />
-        <Button type="submit" disabled={form.formState.isSubmitting} className="self-start">
+        <Button type="submit" disabled={form.formState.isSubmitting} className={fullWidth ? undefined : "self-start"}>
           {form.formState.isSubmitting ? <Spinner data-icon="inline-start" /> : <KeyRound data-icon="inline-start" />}
           {submitLabel}
         </Button>

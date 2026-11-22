@@ -28,6 +28,7 @@ export function ChangePasswordPage() {
           )}
           <ChangePasswordForm
             submitLabel="Salvar e continuar"
+            fullWidth
             onDone={async () => {
               setMe({ ...me, mustChangePassword: false })
               toast.success("Senha alterada.")
