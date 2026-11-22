@@ -126,7 +126,7 @@ export function StationTabs({
 }) {
   return (
     <Tabs value={tab} onValueChange={(t) => onTabChange(t as StationTab)}>
-      <TabsList className="flex-wrap">
+      <TabsList className="w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:w-fit [&::-webkit-scrollbar]:hidden">
         <TabsTrigger value="chuva">
           <LineChart /> Chuva
         </TabsTrigger>

@@ -31,7 +31,7 @@ function PublicStationTabs({ station: s, tab, onTabChange }: { station: PublicSt
   const points = useMemo(() => [{ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude, mm }], [s.id, s.name, s.latitude, s.longitude, mm])
   return (
     <Tabs value={tab} onValueChange={(t) => onTabChange(t as Tab)}>
-      <TabsList className="flex-wrap">
+      <TabsList className="w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] sm:w-fit [&::-webkit-scrollbar]:hidden">
         <TabsTrigger value="chuva">
           <LineChart /> Chuva
         </TabsTrigger>
