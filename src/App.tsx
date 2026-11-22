@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ComponentType } from "react"
-import { Outlet, Route, Routes, useLocation } from "react-router"
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router"
 import { RedirectIfAuthed, RequireAdmin, RequireAuth } from "@/components/routing/guards"
 import { ErrorBoundary, NotFound } from "@/components/routing/not-found"
 import { Spinner } from "@/components/ui/spinner"
@@ -25,7 +25,6 @@ const UsersListPage = page(() => import("@/pages/app/users/ListPage"), "UsersLis
 const UserNewPage = page(() => import("@/pages/app/users/NewPage"), "UserNewPage")
 const ChangePasswordPage = page(() => import("@/pages/auth/ChangePasswordPage"), "ChangePasswordPage")
 const LoginPage = page(() => import("@/pages/auth/LoginPage"), "LoginPage")
-const AboutPage = page(() => import("@/pages/public/AboutPage"), "AboutPage")
 const HomePage = page(() => import("@/pages/public/HomePage"), "HomePage")
 const MapPage = page(() => import("@/pages/public/MapPage"), "MapPage")
 const PublicLayout = page(() => import("@/pages/public/PublicLayout"), "PublicLayout")
@@ -34,9 +33,11 @@ const PublicStationsPage = page(() => import("@/pages/public/StationsPage"), "Pu
 
 /** Volta ao topo ao trocar de página (o BrowserRouter não faz isso sozinho). */
 function ScrollToTop() {
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
   useEffect(() => {
-    window.scrollTo(0, 0)
+    // Com âncora (ex.: /#como-funciona), quem rola é a própria página.
+    if (!hash) window.scrollTo(0, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
   return null
 }
@@ -55,7 +56,8 @@ export function App() {
             <Route path="mapa" element={<MapPage />} />
             <Route path="estacoes" element={<PublicStationsPage />} />
             <Route path="estacoes/:id" element={<PublicStationDetailPage />} />
-            <Route path="sobre" element={<AboutPage />} />
+            {/* "Sobre" virou a seção "Como funciona" da home */}
+            <Route path="sobre" element={<Navigate to={{ pathname: "/", hash: "como-funciona" }} replace />} />
           </Route>
 
           {/* Autenticação */}

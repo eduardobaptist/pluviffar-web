@@ -58,11 +58,9 @@ export function SeriesPanel({
           {table ? (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="text-lg font-semibold text-foreground tabular-nums">{fmtMm(table.bucketsWithData ? table.totalMm : null)}</span>
-              {mode === "private" && (
-                <span className="flex items-center gap-1">
-                  cobertura <CoverageBadge value={table.coverage} />
-                </span>
-              )}
+              <span className="flex items-center gap-1">
+                cobertura <CoverageBadge value={table.coverage} />
+              </span>
               <span>
                 {table.rows.length - table.bucketsWithData} de {table.rows.length} intervalos sem dados
               </span>
@@ -114,7 +112,9 @@ export function SeriesPanel({
           <Info />
           <AlertDescription>
             Intervalos sem leitura aparecem como “Sem dados” (traço cinza no gráfico, célula hachurada no calendário): ausência de pacote nunca é tratada como chuva zero.
-            {mode === "private" && " Cobertura = leituras recebidas ÷ esperadas pelo intervalo de envio reportado."}
+            {mode === "public"
+              ? " Na área pública a cobertura não é estimável (o intervalo de envio não é divulgado)."
+              : " Cobertura = leituras recebidas ÷ esperadas pelo intervalo de envio reportado."}
           </AlertDescription>
         </Alert>
         {showTable && table && (
@@ -125,7 +125,7 @@ export function SeriesPanel({
                   <TableHead>Início</TableHead>
                   <TableHead className="text-right">Chuva</TableHead>
                   <TableHead className="text-right">Leituras</TableHead>
-                  {mode === "private" && <TableHead className="text-right">Cobertura</TableHead>}
+                  <TableHead className="text-right">Cobertura</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,7 +134,7 @@ export function SeriesPanel({
                     <TableCell>{bucketLabel(r.start, bucket, undefined, true)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtMm(r.mm)}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.readings}</TableCell>
-                    {mode === "private" && <TableCell className="text-right tabular-nums">{fmtPct(r.coverage)}</TableCell>}
+                    <TableCell className="text-right tabular-nums">{fmtPct(r.coverage)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

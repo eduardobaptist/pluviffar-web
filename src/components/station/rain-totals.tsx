@@ -72,7 +72,6 @@ export function RainTotals({
   neverReported,
   windows,
   featured = false,
-  showCoverage = true,
 }: {
   totals: PrecipitationTotals | undefined
   coverage: TotalsCoverage | null
@@ -82,8 +81,6 @@ export function RainTotals({
   windows?: TotalsWindow[]
   /** Destaque (painel do produtor): números maiores e só o percentual de cobertura, sem o aviso "acumulado parcial". */
   featured?: boolean
-  /** false na área pública: a API não expõe o intervalo de envio, então não há cobertura a mostrar. */
-  showCoverage?: boolean
 }) {
   const items = windows ? ITEMS.filter((it) => windows.includes(it.id)) : ITEMS
   return (
@@ -98,11 +95,9 @@ export function RainTotals({
                 <CardDescription className="flex items-center gap-2 text-base font-medium text-foreground md:text-lg">
                   <CloudRain className="size-5 text-rain" aria-hidden /> {it.label}
                 </CardDescription>
-                {showCoverage && (
-                  <CardAction className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    cobertura <CoverageBadge value={neverReported ? 0 : cov} />
-                  </CardAction>
-                )}
+                <CardAction className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  cobertura <CoverageBadge value={neverReported ? 0 : cov} />
+                </CardAction>
                 <CardTitle className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">
                   {!totals ? (
                     <Skeleton className="h-10 w-32" />
@@ -126,16 +121,14 @@ export function RainTotals({
                 {totals ? fmtMm(value) : <Skeleton className="h-7 w-24" />}
               </CardTitle>
             </CardHeader>
-            {showCoverage && (
-              <CardContent className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                Cobertura <CoverageBadge value={neverReported ? 0 : cov} />
-                {cov != null && cov < 99.5 && value != null && (
-                  <span className="flex items-center gap-1 text-warning-foreground">
-                    <AlertTriangle className="size-3" /> acumulado parcial
-                  </span>
-                )}
-              </CardContent>
-            )}
+            <CardContent className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              Cobertura <CoverageBadge value={neverReported ? 0 : cov} />
+              {cov != null && cov < 99.5 && value != null && (
+                <span className="flex items-center gap-1 text-warning-foreground">
+                  <AlertTriangle className="size-3" /> acumulado parcial
+                </span>
+              )}
+            </CardContent>
           </Card>
         )
       })}

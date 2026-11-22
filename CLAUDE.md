@@ -85,14 +85,14 @@ src/
                             status-badges (atualidade/cobertura), search-input, owner-select
     form/                   form-field, api-errors, form-root-error, *-form (estação, gateway,
                             usuário, troca de senha)
-    home/                   rain-gauge-animation (SVG + keyframes `.pluvio-*` no index.css, respeita reduced-motion),
-                            nearby-stations
+    home/                   rain-gauge-animation (SVG + keyframes `.pluvio-*` no index.css, respeita reduced-motion; usada
+                            na seção "Como funciona"), station-carousel (carrossel do hero, shadcn `carousel`/embla)
     station/                precipitation-chart, series-panel, period-controls, date-range-picker,
                             rain-totals (+ useTotalsCoverage; `featured`/`windows` no painel), rain-calendar, device-summary, telemetry-tables,
                             station-map, export-form,
                             station-tabs (abas Chuva/Leituras/Status/Configuração/Exportar, iguais no painel e no detalhe)
   pages/                    uma página por rota (ver mapa de rotas)
-    public/                 PublicLayout, HomePage, MapPage, StationsPage, StationDetailPage, AboutPage
+    public/                 PublicLayout, HomePage (hero + mapa + seção "Como funciona"), MapPage, StationsPage, StationDetailPage
     auth/                   LoginPage, ChangePasswordPage
     app/                    AppLayout, DashboardPage (escolhe pelo perfil), ExportPage, ProfilePage,
                             dashboard/ (AdminDashboard, ProducerDashboard),
@@ -103,11 +103,11 @@ src/
 
 | Rota | Acesso | Conteúdo | Endpoints |
 | --- | --- | --- | --- |
-| `/` | público | hero (texto + pluviômetro de báscula animado), estações mais próximas (geolocalização pedida ao abrir; sem permissão → atualizadas recentemente), mapa | `GET /api/public/stations` |
+| `/` | público | hero com carrossel de estações ao lado (desktop) / abaixo (celular): mais próximas (geolocalização pedida ao abrir; sem permissão → atualizadas recentemente); mapa; seção `#como-funciona` (pluviômetro animado + passos + privacidade) — o link "Sobre" do cabeçalho é essa âncora | `GET /api/public/stations` |
 | `/mapa` | público | lista filtrável + mapa | idem |
 | `/estacoes` | público | tabela de estações públicas | idem |
 | `/estacoes/:id?tab=chuva\|localizacao\|exportar` | público | mesmo padrão do `StationTabs`: aba Chuva (totais Hoje/7/30 em destaque + série), Localização (mapa) e **Exportar série** | `GET /api/public/stations/{id}`, `/precipitation` |
-| `/sobre` | público | estático | — |
+| `/sobre` | público | redireciona para `/#como-funciona` | — |
 | `/entrar?redirect=` | sem sessão | login | `GET /api/auth/csrf`, `POST /api/auth/login` |
 | `/trocar-senha` | logado | troca obrigatória (`mustChangePassword`) | `PUT /api/auth/password` |
 | `/painel` | ADMIN | painel da rede: cards de usuários e estações, acesso rápido, mapa com todas as estações (zoom ajustado aos pontos) | `/stations` (todas as páginas), `/users` |
@@ -167,9 +167,9 @@ O front (`lib/period.ts → buildSeriesTable`):
 - estima `esperadas = duração do bucket (recortada ao período) ÷ sendIntervalS` da estação e
   `cobertura = recebidas ÷ esperadas` (máx. 100%);
 - sem `sendIntervalS` (estação que nunca reportou `conf`) → cobertura `null` e o badge mostra "cobertura —" com explicação.
-- **área pública**: a API não expõe o intervalo de envio, então a área pública **não mostra cobertura nem atualidade**
-  (sem badges de cobertura/online; `RainTotals showCoverage={false}`, `SeriesPanel mode="public"`, exportação sem
-  colunas de cobertura — `situacao` só `COM_DADOS|SEM_DADOS`). A regra "sem dado ≠ chuva zero" continua valendo.
+- **área pública**: a API não expõe o intervalo de envio, então a cobertura não é estimável: totais, gráfico,
+  tabela e calendário **mostram o campo de cobertura** com "—" (e o aviso explicando), como no logado; a exportação
+  pública fica sem colunas de cobertura (`situacao` só `COM_DADOS|SEM_DADOS`). A regra "sem dado ≠ chuva zero" continua valendo.
 Totais do overview (hoje/24 h/7/30 dias; o painel do produtor mostra só hoje/7/30, em destaque, com o badge de
 cobertura no lugar do aviso "acumulado parcial"): cobertura estimada por `useTotalsCoverage` com uma série
 HOUR (24 h) e uma DAY (30 dias). Faixas do badge: ≥95% boa, ≥70% parcial, abaixo disso baixa.

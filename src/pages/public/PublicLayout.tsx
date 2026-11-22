@@ -1,6 +1,6 @@
 import { Menu } from "lucide-react"
 import { Suspense, useState } from "react"
-import { Link, NavLink, Outlet } from "react-router"
+import { Link, Outlet, useLocation } from "react-router"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
@@ -9,23 +9,33 @@ import { Logo } from "@/components/layout/logo"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
 
+/** "Sobre" é uma âncora interna da home (seção "Como funciona"). */
 const NAV = [
-  { to: "/", label: "Início" },
-  { to: "/mapa", label: "Mapa" },
-  { to: "/estacoes", label: "Estações" },
-  { to: "/sobre", label: "Sobre" },
+  { pathname: "/", hash: "", label: "Início" },
+  { pathname: "/mapa", hash: "", label: "Mapa" },
+  { pathname: "/estacoes", hash: "", label: "Estações" },
+  { pathname: "/", hash: "#como-funciona", label: "Sobre" },
 ] as const
 
 function NavLinks({ onNavigate, vertical = false }: { onNavigate?: () => void; vertical?: boolean }) {
+  const loc = useLocation()
   return (
     <>
-      {NAV.map((n) => (
-        <Button key={n.to} asChild variant="ghost" className={vertical ? "justify-start" : undefined}>
-          <NavLink to={n.to} end={n.to === "/"} onClick={onNavigate} className="text-muted-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground">
-            {n.label}
-          </NavLink>
-        </Button>
-      ))}
+      {NAV.map((n) => {
+        const active = n.pathname === "/" ? loc.pathname === "/" && loc.hash === n.hash : loc.pathname.startsWith(n.pathname)
+        return (
+          <Button key={n.label} asChild variant="ghost" className={vertical ? "justify-start" : undefined}>
+            <Link
+              to={{ pathname: n.pathname, hash: n.hash }}
+              aria-current={active ? "page" : undefined}
+              onClick={onNavigate}
+              className="text-muted-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
+            >
+              {n.label}
+            </Link>
+          </Button>
+        )
+      })}
     </>
   )
 }

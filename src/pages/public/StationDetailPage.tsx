@@ -44,7 +44,7 @@ function PublicStationTabs({ station: s, tab, onTabChange }: { station: PublicSt
 
       <TabsContent value="chuva" className="pt-2">
         <div className="flex flex-col gap-4">
-          <RainTotals totals={s.precipitation} coverage={null} showCoverage={false} neverReported={!s.lastReadingAt} windows={["today", "last7d", "last30d"]} featured />
+          <RainTotals totals={s.precipitation} coverage={null} neverReported={!s.lastReadingAt} windows={["today", "last7d", "last30d"]} featured />
           <SeriesPanel key={s.id} stationId={s.id} mode="public" initial="7" chartClassName="h-[clamp(18rem,45svh,30rem)]" />
         </div>
       </TabsContent>
@@ -118,7 +118,7 @@ export function PublicStationDetailPage() {
             description={
               s && (
                 <span className="flex flex-wrap items-center gap-2">
-                  <span>{s.lastReadingAt ? `última leitura ${fmtRelative(s.lastReadingAt)}` : "nunca enviou"}</span>·<span>fuso {s.timezone}</span>
+                  <span>{s.lastReadingAt ? `última leitura ${fmtRelative(s.lastReadingAt)}` : "nunca enviou"}</span>
                   <Badge>Pública</Badge>
                 </span>
               )
