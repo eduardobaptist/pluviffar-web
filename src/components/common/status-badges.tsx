@@ -6,7 +6,7 @@ const FRESH: Record<Freshness, { label: string; dot: string }> = {
   online: { label: "Online", dot: "bg-success" },
   late: { label: "Atrasada", dot: "bg-warning" },
   offline: { label: "Sem comunicação", dot: "bg-destructive" },
-  never: { label: "Nunca enviou", dot: "bg-muted-foreground/40" },
+  never: { label: "Nunca enviou dados", dot: "bg-muted-foreground/40" },
 }
 
 export function StatusDot({ state, className }: { state: Freshness; className?: string }) {

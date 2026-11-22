@@ -119,7 +119,7 @@ export function PublicStationDetailPage() {
             description={
               s && (
                 <span className="flex flex-wrap items-center gap-2">
-                  <span>{s.lastReadingAt ? `última leitura ${fmtRelative(s.lastReadingAt)}` : "nunca enviou"}</span>
+                  <span>{s.lastReadingAt ? `última leitura ${fmtRelative(s.lastReadingAt)}` : "nunca enviou dados"}</span>
                   <Badge>Pública</Badge>
                 </span>
               )

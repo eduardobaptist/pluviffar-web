@@ -49,7 +49,7 @@ function RainTab({ station, overview }: { station: Station; overview: StationOve
               {overview && <StatusDot state={freshness(last, station.sendIntervalS)} />}
               Mais informações
               {overview && (
-                <span className="truncate font-normal text-muted-foreground">· {last ? `última leitura ${fmtRelative(last)}` : "nunca enviou"}</span>
+                <span className="truncate font-normal text-muted-foreground">· {last ? `última leitura ${fmtRelative(last)}` : "nunca enviou dados"}</span>
               )}
             </span>
             <ChevronDown className={cn("transition-transform", open && "rotate-180")} data-icon="inline-end" />

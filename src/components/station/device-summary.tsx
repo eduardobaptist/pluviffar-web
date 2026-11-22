@@ -39,7 +39,7 @@ export function DeviceSummary({ overview, sendIntervalS }: { overview: StationOv
         value={
           <span className="flex items-center gap-2">
             <StatusDot state={freshness(r?.measuredAt, sendIntervalS)} />
-            {r ? fmtRelative(r.measuredAt) : "Nunca enviou"}
+            {r ? fmtRelative(r.measuredAt) : "Nunca enviou dados"}
           </span>
         }
         hint={r ? fmtDateTime(r.measuredAt) : undefined}
