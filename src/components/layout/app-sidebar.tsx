@@ -57,8 +57,8 @@ export function AppSidebar({ me }: { me: CurrentUser }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
-              <Link to="/painel">
-                <Logo className="group-data-[collapsible=icon]:[&>span]:hidden" />
+              <Link to="/painel" className="justify-center">
+                <Logo className="group-data-[collapsible=icon]:[&>img]:block group-data-[collapsible=icon]:[&>img]:h-7 group-data-[collapsible=icon]:[&>span]:hidden" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
