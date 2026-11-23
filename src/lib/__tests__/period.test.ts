@@ -107,12 +107,12 @@ describe("seriesSheet", () => {
     expect(sh.rows.map((r) => r[6])).toEqual(["COMPLETO", "SEM_DADOS", "PARCIAL"])
     expect(sh.rows[1]![2]).toBeNull()
   })
-  it("área pública: mesmas colunas, cobertura vazia e situação COBERTURA_DESCONHECIDA", () => {
-    const priv = seriesSheet({ stations: [st], bucket: "DAY", range, format: "csv" }, st, [series], "America/Sao_Paulo")
+  it("área pública: sem colunas de cobertura, situação só COM_DADOS|SEM_DADOS", () => {
     const sh = seriesSheet({ stations: [st], bucket: "DAY", range, format: "csv", publicMode: true }, st, [series], "America/Sao_Paulo")
-    expect(sh.columns.map((c) => c.header)).toEqual(priv.columns.map((c) => c.header))
-    expect(sh.rows.every((r) => r[4] === null && r[5] === null)).toBe(true)
-    expect(sh.rows.map((r) => r[6])).toEqual(["COBERTURA_DESCONHECIDA", "SEM_DADOS", "COBERTURA_DESCONHECIDA"])
+    expect(sh.columns.map((c) => c.header)).toEqual(["estacao", "inicio", "chuva_mm", "leituras_recebidas", "situacao"])
+    expect(sh.columns.some((c) => /cobertura/i.test(c.description ?? ""))).toBe(false)
+    expect(sh.rows.map((r) => r[4])).toEqual(["COM_DADOS", "SEM_DADOS", "COM_DADOS"])
+    expect(sh.rows[1]![2]).toBeNull()
   })
 })
 

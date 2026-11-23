@@ -42,7 +42,7 @@ export interface ExportRequest {
   raw?: boolean
   range: DateRange
   format: ExportFormat
-  /** Área pública: endpoints /api/public, sem colunas de cobertura. */
+  /** Área pública: endpoints /api/public, sem colunas nem menções de cobertura. */
   publicMode?: boolean
   timezone?: string
 }
@@ -58,6 +58,8 @@ export const SITUATION_LABEL = {
   partial: "PARCIAL",
   noData: "SEM_DADOS",
   unknown: "COBERTURA_DESCONHECIDA",
+  /** Área pública (sem cobertura): bucket com leitura. */
+  hasData: "COM_DADOS",
 } as const
 
 // ------------------------------------------------------------------ coleta
@@ -121,12 +123,10 @@ function tzLabel(tz: string) {
 const START_DESC: Record<Bucket, string> = { HOUR: "Início da hora", DAY: "Dia", WEEK: "Início da semana", MONTH: "Início do mês" }
 
 export function seriesSheet(req: ExportRequest, st: ExportStation, parts: PrecipitationSeries[], tz: string): Sheet {
-  // Mesmas colunas e valores em qualquer origem. Na área pública a API não expõe o intervalo de envio →
-  // esperadas/cobertura ficam vazias e a situação dos buckets com dado é COBERTURA_DESCONHECIDA.
-  const sendIntervalS = req.publicMode ? null : st.sendIntervalS
+  if (req.publicMode) return publicSeriesSheet(req, st, parts, tz)
   const rows: Cell[][] = []
   for (const s of parts) {
-    for (const r of buildSeriesTable(s, sendIntervalS).rows) {
+    for (const r of buildSeriesTable(s, st.sendIntervalS).rows) {
       const situation =
         r.mm == null
           ? SITUATION_LABEL.noData
@@ -161,6 +161,25 @@ export function seriesSheet(req: ExportRequest, st: ExportStation, parts: Precip
       },
       { header: "cobertura_pct", type: "number", description: "Recebidas ÷ esperadas, em % (máx. 100); vazio se não estimável" },
       { header: "situacao", type: "string", description: "COMPLETO, PARCIAL, SEM_DADOS ou COBERTURA_DESCONHECIDA" },
+    ],
+    rows,
+  }
+}
+
+/** Área pública: sem colunas de cobertura (cobertura é dado do produtor/admin); situação só COM_DADOS|SEM_DADOS. */
+function publicSeriesSheet(req: ExportRequest, st: ExportStation, parts: PrecipitationSeries[], tz: string): Sheet {
+  const rows: Cell[][] = []
+  for (const s of parts)
+    for (const r of buildSeriesTable(s, null).rows)
+      rows.push([st.name, wall(r.start, tz), r.mm, r.readings, r.mm == null ? SITUATION_LABEL.noData : SITUATION_LABEL.hasData])
+  return {
+    name: st.name,
+    columns: [
+      { header: "estacao", type: "string", description: "Nome da estação" },
+      { header: "inicio", type: req.bucket === "HOUR" ? "datetime" : "date", description: `${START_DESC[req.bucket]} (${tzLabel(tz)})` },
+      { header: "chuva_mm", type: "number", description: "Chuva acumulada no período, em mm (vazio = sem dados, não é zero)" },
+      { header: "leituras_recebidas", type: "integer", description: "Pacotes recebidos no período" },
+      { header: "situacao", type: "string", description: "COM_DADOS ou SEM_DADOS" },
     ],
     rows,
   }
@@ -323,7 +342,7 @@ export function exportMeta(req: ExportRequest): [string, string][] {
       "Aviso",
       req.raw
         ? 'Uma linha por pacote recebido. Intervalos sem linha são pacotes não recebidos — NÃO significam chuva zero. "Pacotes perdidos antes" vem das lacunas da sequência (a sequência reinicia quando o equipamento religa).'
-        : `Períodos sem leitura aparecem com chuva vazia e situação "${SITUATION_LABEL.noData}": ausência de dado NÃO significa chuva zero. Cobertura abaixo de 100% indica acumulado parcial.${req.publicMode ? ` Área pública: o intervalo de envio não é divulgado, então a cobertura não é estimável (situação "${SITUATION_LABEL.unknown}").` : ""}`,
+        : `Períodos sem leitura aparecem com chuva vazia e situação "${SITUATION_LABEL.noData}": ausência de dado NÃO significa chuva zero.${req.publicMode ? "" : " Cobertura abaixo de 100% indica acumulado parcial."}`,
     ],
   ]
 }

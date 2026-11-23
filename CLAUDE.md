@@ -167,10 +167,10 @@ O front (`lib/period.ts → buildSeriesTable`):
 - estima `esperadas = duração do bucket (recortada ao período) ÷ sendIntervalS` da estação e
   `cobertura = recebidas ÷ esperadas` (máx. 100%);
 - sem `sendIntervalS` (estação que nunca reportou `conf`) → cobertura `null` e o badge mostra "cobertura —" com explicação.
-- **área pública**: a API não expõe o intervalo de envio, então a cobertura não é estimável: totais, gráfico,
-  tabela e calendário **mostram o campo de cobertura** com "—" (e o aviso explicando), como no logado; a exportação
-  pública tem as mesmas colunas, com `leituras_esperadas`/`cobertura_pct` vazias e `situacao` `COBERTURA_DESCONHECIDA`
-  nos buckets com dado. A regra "sem dado ≠ chuva zero" continua valendo.
+- **área pública**: **não mostra nem menciona cobertura** (decisão de produto: é dado do produtor/admin; a API pública
+  também não expõe o intervalo de envio). `RainTotals showCoverage={false}`, `SeriesPanel mode="public"` (sem badge,
+  coluna nem texto de cobertura; gráfico e calendário já omitem quando `coverage` é `null`) e exportação pública sem
+  `leituras_esperadas`/`cobertura_pct`, com `situacao` só `COM_DADOS|SEM_DADOS`. A regra "sem dado ≠ chuva zero" continua valendo.
 Totais do overview (hoje/24 h/7/30 dias; o painel do produtor mostra só hoje/7/30, em destaque, com o badge de
 cobertura no lugar do aviso "acumulado parcial"): cobertura estimada por `useTotalsCoverage` com uma série
 HOUR (24 h) e uma DAY (30 dias). Faixas do badge: ≥95% boa, ≥70% parcial, abaixo disso baixa.
@@ -204,8 +204,8 @@ Status do dispositivo não é exportado. Geração em `lib/export.ts`:
 
 - **Colunas** com nomes técnicos em pt-BR (`snake_case`, sem acento — quem exporta vai analisar em pandas/R/planilha):
   `estacao`, `inicio`, `chuva_mm`, `leituras_recebidas`, `leituras_esperadas`, `cobertura_pct`, `situacao`
-  (`COMPLETO|PARCIAL|SEM_DADOS|COBERTURA_DESCONHECIDA`). Mesmas colunas e valores em toda origem: na área pública
-  (sem intervalo de envio) esperadas/cobertura ficam vazias e `situacao` é `SEM_DADOS|COBERTURA_DESCONHECIDA`. Bucket sem leitura → chuva vazia, nunca 0. Datas na hora local do fuso (horário de Brasília).
+  (`COMPLETO|PARCIAL|SEM_DADOS|COBERTURA_DESCONHECIDA`). Na área pública não há colunas de cobertura:
+  `estacao`, `inicio`, `chuva_mm`, `leituras_recebidas`, `situacao` (`COM_DADOS|SEM_DADOS`). Bucket sem leitura → chuva vazia, nunca 0. Datas na hora local do fuso (horário de Brasília).
 - **Leituras** (`raw`): `estacao`, `medido_em`, `recebido_em` (com segundos), `basculadas`, `chuva_mm`, `seq`,
   `pacotes_perdidos_antes` (lacunas de `seq`; reinício não conta). Ordenadas e sem duplicatas.
 - **Sem limites no front** (período, linhas ou nº de estações): o período é fatiado pelos limites da API por requisição
@@ -259,10 +259,9 @@ TODOs para o backend (o front já tem pontos de encaixe ou paliativos marcados):
 - [ ] **Cobertura temporal nos agregados**: `expectedReadings`/`coveragePct` em `PrecipitationPoint`,
       `coveragePct` em `PrecipitationSeries` e por janela em `PrecipitationTotals`. Hoje o front estima com
       `sendIntervalS` e precisa de 2 requisições extras por estação para cobrir os totais.
-- [ ] **Cobertura na área pública**: `PublicStationDetail`/`PublicStationSummary` não trazem cobertura nem
-      intervalo de envio → a área pública não consegue mostrar cobertura (exibe "cobertura —").
-      `last24hMm` deveria vir acompanhado de `last24hCoveragePct` (hoje "0 mm" e "sem dados" se confundem
-      quando há leitura antiga; o front usa `lastReadingAt` para mostrar "Sem dados").
+- [ ] **"Sem dados" nas 24 h públicas**: `last24hMm` vem 0 tanto para "não choveu" quanto para "não houve leitura"
+      nas últimas 24 h; o front usa `lastReadingAt` para mostrar "Sem dados". Um `last24hReadingsCount` (ou `null`
+      sem leitura) resolveria. (Cobertura na área pública **não** é desejada.)
 - [ ] **Exportação no servidor**: `GET /api/stations/{id}/export?dataset=series|readings&format=csv|xlsx&from&to&bucket`
       (streaming) e `GET /api/public/stations/{id}/export`. Alternativa mínima: aumentar o `size` máximo de `/readings`
       (100 → 5000) — com leitura por minuto, 93 dias = ~1340 requisições.

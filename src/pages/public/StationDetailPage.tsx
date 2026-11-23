@@ -45,7 +45,7 @@ function PublicStationTabs({ station: s, tab, onTabChange }: { station: PublicSt
 
       <TabsContent value="chuva" className="pt-2">
         <div className="flex flex-col gap-4">
-          <RainTotals totals={s.precipitation} coverage={null} neverReported={!s.lastReadingAt} windows={["today", "last7d", "last30d"]} featured />
+          <RainTotals totals={s.precipitation} coverage={null} showCoverage={false} neverReported={!s.lastReadingAt} windows={["today", "last7d", "last30d"]} featured />
           <SeriesPanel key={s.id} stationId={s.id} mode="public" initial="7" chartClassName="h-[clamp(18rem,45svh,30rem)]" />
         </div>
       </TabsContent>
